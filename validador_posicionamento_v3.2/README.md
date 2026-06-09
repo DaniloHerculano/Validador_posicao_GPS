@@ -1,8 +1,8 @@
-# 📡 Validador de Posicionamento — v3.2
+# 📡 Validador de Posicionamento — v0.2
 
 Análise comparativa de rastreadores GPS Real × Posição Estimada · Stoneridge Brasil
 
-## Novidades da v3.2
+## Novidades da v0.2
 - **Tema claro** (fundo branco) com identidade visual Stoneridge
 - **Logo** no topo da barra lateral
 - Título do cabeçalho corrigido (não corta mais)
@@ -49,7 +49,7 @@ fora de 0–20 no CSV são descartados; o XLS (em %) tem prioridade.
 ---
 Stoneridge Brasil · v3.2
 
-## v3.2
+## v0.2
 - Seção **"Como Usar"** dentro da plataforma (aba dedicada + guia rápido no topo)
 - Links diretos para baixar cada relatório:
   - CSV (log técnico): http://websites01.positronrt.cloud/firmware/index.php?tipoparametro=diversosplanform
@@ -57,5 +57,5 @@ Stoneridge Brasil · v3.2
 - Mensagens contextuais indicando qual arquivo subir para destravar cada análise
 - Upload parcial (só CSV ou só XLS) totalmente suportado
 
-## v3.2.1
+## v0.2.1
 - Correção: erro (KeyError) ao analisar equipamentos sem dados de posição (ex.: só CSV com GPS off). Mapa e mapa de calor agora pulam graciosamente equipamentos sem latitude/longitude e exibem aviso orientando subir o XLS.
