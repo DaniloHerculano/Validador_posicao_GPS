@@ -27,7 +27,7 @@ st.markdown(HELP_CSS, unsafe_allow_html=True)
 
 st.markdown("""
 <div class="hero-wrap"><div class="hero-bar"></div><div>
-<div class="hero-title">VALIDADOR DE POSICIONAMENTO</div>
+<div class="hero-title">TESTE DE RODAGEM</div>
 <div class="hero-sub">Análise comparativa GPS Real × Posição Estimada · Stoneridge Brasil</div>
 </div></div>""", unsafe_allow_html=True)
 
