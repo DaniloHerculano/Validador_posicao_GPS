@@ -46,7 +46,7 @@ with st.sidebar:
     raio3 = st.number_input("Raio 3 (km)", value=5.0, step=0.5, min_value=0.1)
     st.markdown("---")
     botao_sair()
-    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.6</span>',
+    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.7</span>',
                 unsafe_allow_html=True)
 
 # ── AJUDA RÁPIDA ──────────────────────────────────────────────────────────────
@@ -96,18 +96,23 @@ sec("02 · Equipamentos Carregados")
 rows = "".join(
     f"<tr><td style='font-family:Barlow Condensed'>{d['modelo']}</td>"
     f"<td style='font-family:Barlow Condensed;color:{SR_RED};font-weight:700'>{d['pin']}</td>"
+    f"<td style='font-size:.78rem;color:#6b7f8f'>{d['arquivo']}</td>"
     f"<td>{badge(d['tipo'])}</td>"
     f"<td style='font-family:Barlow Condensed;color:#6b7f8f'>{d['fonte']}</td>"
     f"<td style='text-align:right;font-family:Barlow Condensed'>{d['registros']:,}</td></tr>"
     for d in dados)
 st.markdown(f'<table class="file-table"><thead><tr><th>Modelo</th><th>PIN</th>'
-    f'<th>Tipo</th><th>Fonte</th><th style="text-align:right">Registros</th></tr></thead>'
+    f'<th>Arquivo</th><th>Tipo</th><th>Fonte</th><th style="text-align:right">Registros</th></tr></thead>'
     f'<tbody>{rows}</tbody></table>', unsafe_allow_html=True)
 
 # ── SELEÇÃO ───────────────────────────────────────────────────────────────────
 sec("03 · Configurar Comparação")
 def rotulo(d):
-    return f"{d['modelo']} · {d['pin']}"
+    # O nome do arquivo (chave do agrupamento) e sempre unico e ja costuma
+    # conter o modelo; garante que dois equipamentos nunca colidam no seletor.
+    if d["pin"] and d["pin"] != "N/A":
+        return f"{d['arquivo']}  ·  PIN {d['pin']}"
+    return d["arquivo"]
 mapa_rotulo = {rotulo(d): d["arquivo"] for d in dados}
 
 reais = [rotulo(d) for d in dados if d["tipo"] == "GPS Real"]
