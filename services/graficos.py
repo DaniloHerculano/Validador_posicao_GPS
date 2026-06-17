@@ -87,6 +87,20 @@ def aba_visao_geral(resultados, df_ref, ref_nome, raios):
 # ══════════════════════════════════════════════════════════════════════════════
 # MAPA
 # ══════════════════════════════════════════════════════════════════════════════
+def _circulo_geo(lat, lon, raio_km, n=40):
+    """Gera os pontos (lat, lon) de um circulo de raio em km ao redor de um centro.
+    Aproximacao adequada para escalas urbanas/regionais."""
+    import math
+    pts_lat, pts_lon = [], []
+    dlat = raio_km / 111.32
+    dlon = raio_km / (111.32 * max(math.cos(math.radians(lat)), 1e-6))
+    for k in range(n + 1):
+        ang = 2 * math.pi * k / n
+        pts_lat.append(lat + dlat * math.sin(ang))
+        pts_lon.append(lon + dlon * math.cos(ang))
+    return pts_lat, pts_lon
+
+
 def aba_mapa(resultados, df_ref, ref_nome):
     sec("Mapa Comparativo de Posições")
     st.caption("Referência (GPS Real) + amostras testadas · "
@@ -97,7 +111,7 @@ def aba_mapa(resultados, df_ref, ref_nome):
                 "(relatório de posição). Suba o XLS da referência para visualizar o mapa.")
         return
 
-    # Controles
+    # Controles gerais
     c1, c2 = st.columns([1, 1])
     with c1:
         mostrar = st.checkbox("Mostrar linhas de erro", value=True)
@@ -110,6 +124,22 @@ def aba_mapa(resultados, df_ref, ref_nome):
                 "diamond": "◆ Losango", "triangle": "▲ Triângulo"}.get(s, s),
             help="A referência sempre usa círculo azul. Se um formato não aparecer, escolha outro."
         )
+
+    # Quais equipamentos têm raio do sistema (KML) disponível
+    com_raio = [nome for nome, dfs in resultados.items()
+                if len(dfs) > 0 and "raio_km" in dfs.columns
+                and dfs["raio_km"].notna().any()]
+    raio_ativo = {}
+    destacar_fora = False
+    if com_raio:
+        st.markdown("**🎯 Raio do sistema (círculo de estimativa) — habilite por equipamento:**")
+        cols = st.columns(min(len(com_raio), 4))
+        for j, nome in enumerate(com_raio):
+            with cols[j % len(cols)]:
+                raio_ativo[nome] = st.checkbox(nome, value=False, key=f"raio_map_{j}")
+        destacar_fora = st.checkbox(
+            "Destacar em vermelho as amostras que ficaram fora do raio do sistema",
+            value=False, key="destaca_fora")
 
     fig = go.Figure()
 
@@ -140,15 +170,44 @@ def aba_mapa(resultados, df_ref, ref_nome):
             dt_txt = pd.Series([""] * len(dfv), index=dfv.index)
         erro_txt = [f"{d:.3f} km" if pd.notna(d) else "—" for d in dfv["distancia_km"]]
         customdata = list(zip(erro_txt, list(dt_txt)))
-        fig.add_trace(go.Scattermap(
-            lat=dfv["lat_comp"], lon=dfv["lon_comp"], mode="markers",
-            marker=dict(size=11, color=cor, symbol=formato),
-            name=nome,
-            customdata=customdata,
-            hovertemplate="<b>" + nome + "</b><br>"
-                          "Erro: %{customdata[0]}<br>"
-                          "%{lat:.5f}, %{lon:.5f}<br>"
-                          "%{customdata[1]}<extra></extra>"))
+
+        tem_raio_eq = "raio_km" in dfv.columns and dfv["raio_km"].notna().any()
+        if destacar_fora and tem_raio_eq and "dentro_raio" in dfv.columns:
+            base_idx = dfv.index
+            dentro_mask = dfv["dentro_raio"].astype("boolean").fillna(True)
+            cd = list(customdata)
+            # Pontos dentro do raio (cor normal)
+            din = dfv[dentro_mask.values]
+            if len(din) > 0:
+                cd_in = [cd[k] for k in range(len(dfv)) if bool(dentro_mask.values[k])]
+                fig.add_trace(go.Scattermap(
+                    lat=din["lat_comp"], lon=din["lon_comp"], mode="markers",
+                    marker=dict(size=11, color=cor, symbol=formato),
+                    name=nome, customdata=cd_in,
+                    hovertemplate="<b>" + nome + "</b> (dentro do raio)<br>"
+                                  "Erro: %{customdata[0]}<br>%{lat:.5f}, %{lon:.5f}<br>"
+                                  "%{customdata[1]}<extra></extra>"))
+            # Pontos fora do raio (vermelho destacado)
+            dfora = dfv[~dentro_mask.values]
+            if len(dfora) > 0:
+                cd_out = [cd[k] for k in range(len(dfv)) if not bool(dentro_mask.values[k])]
+                fig.add_trace(go.Scattermap(
+                    lat=dfora["lat_comp"], lon=dfora["lon_comp"], mode="markers",
+                    marker=dict(size=13, color="#d92020", symbol=formato),
+                    name=f"{nome} — fora do raio", customdata=cd_out,
+                    hovertemplate="<b>" + nome + "</b> ⚠ FORA do raio<br>"
+                                  "Erro: %{customdata[0]}<br>%{lat:.5f}, %{lon:.5f}<br>"
+                                  "%{customdata[1]}<extra></extra>"))
+        else:
+            fig.add_trace(go.Scattermap(
+                lat=dfv["lat_comp"], lon=dfv["lon_comp"], mode="markers",
+                marker=dict(size=11, color=cor, symbol=formato),
+                name=nome,
+                customdata=customdata,
+                hovertemplate="<b>" + nome + "</b><br>"
+                              "Erro: %{customdata[0]}<br>"
+                              "%{lat:.5f}, %{lon:.5f}<br>"
+                              "%{customdata[1]}<extra></extra>"))
         if mostrar:
             lats, lons = [], []
             for _, r in dfv.iterrows():
@@ -157,6 +216,20 @@ def aba_mapa(resultados, df_ref, ref_nome):
             fig.add_trace(go.Scattermap(
                 lat=lats, lon=lons, mode="lines", line=dict(width=1, color=cor),
                 opacity=0.35, name=f"erro {nome}", showlegend=False, hoverinfo="skip"))
+
+        # Círculos de raio do sistema (se habilitado para este equipamento)
+        if raio_ativo.get(nome) and "raio_km" in dfv.columns:
+            dfr = dfv.dropna(subset=["raio_km"])
+            clats, clons = [], []
+            for _, r in dfr.iterrows():
+                cl, co = _circulo_geo(r["lat_comp"], r["lon_comp"], r["raio_km"])
+                clats += cl + [None]
+                clons += co + [None]
+            if clats:
+                fig.add_trace(go.Scattermap(
+                    lat=clats, lon=clons, mode="lines",
+                    line=dict(width=1.2, color=cor), opacity=0.5,
+                    name=f"raio {nome}", showlegend=True, hoverinfo="skip"))
 
     clat = df_ref_v["latitude"].mean() if len(df_ref_v) else -15.7
     clon = df_ref_v["longitude"].mean() if len(df_ref_v) else -47.9
