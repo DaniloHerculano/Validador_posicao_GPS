@@ -87,3 +87,8 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
 (Renumeração: a POC passa a usar versões abaixo de 1.0 por ainda não ser definitiva.)
 - Login: subtítulo "Testes de Rodagem · Validação e Análise · Stoneridge Brasil".
 - Cabeçalho do app: título "TESTE DE RODAGEM".
+
+## v0.7
+- Mapa: opção de exibir o **raio do sistema** (círculo de incerteza do KML) ao redor das amostras estimadas, habilitável/desabilitável **por equipamento**.
+- Mapa: opção de **destacar em vermelho** as amostras que ficaram fora do raio do sistema.
+- Círculo geodésico com erro de aproximação < 0,3%.
