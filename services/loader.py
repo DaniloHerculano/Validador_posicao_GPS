@@ -27,13 +27,30 @@ def extrair_modelo(nome_arquivo: str) -> str:
 
 
 # ── Parsing de campos ─────────────────────────────────────────────────────────
+def _normaliza_banda(texto: str, tech: str) -> str:
+    """Normaliza o campo de banda: 'GSM 1800' → 'GSM1800', 'LTE BAND 28' → 'LTE B28'."""
+    if not texto:
+        return "—"
+    t = texto.upper().strip()
+    m = re.search(r"LTE\s*BAND\s*(\d+)", t)
+    if m:
+        return f"LTE B{m.group(1)}"
+    m = re.search(r"GSM\s*(\d+)", t)
+    if m:
+        return f"GSM{m.group(1)}"
+    m = re.search(r"(WCDMA|UMTS|HSPA|HSDPA)\D*(\d+)?", t)
+    if m:
+        return f"{m.group(1)}{(' B'+m.group(2)) if m.group(2) else ''}"
+    return texto.strip() or "—"
+
+
 def parse_networkinfo(info) -> tuple:
-    """networkinfo: "FDD LTE","72405","LTE BAND 7",2950 → (tecnologia, operadora)."""
+    """networkinfo: "FDD LTE","72405","LTE BAND 7",2950 → (tecnologia, operadora, banda)."""
     if pd.isna(info) or str(info).strip() in ("", "NO SERVICE"):
-        return "Sem Sinal", "Desconhecido"
+        return "Sem Sinal", "Desconhecido", "—"
     s = str(info).strip()
     if "NO SERVICE" in s.upper():
-        return "Sem Sinal", "Desconhecido"
+        return "Sem Sinal", "Desconhecido", "—"
     parts = [p.strip().strip('"').strip("'") for p in s.split(",")]
     tech = "Desconhecido"
     if parts:
@@ -45,7 +62,8 @@ def parse_networkinfo(info) -> tuple:
     operadora = "Desconhecido"
     if len(parts) > 1:
         operadora = OPERADORAS.get(parts[1].strip(), "Desconhecido")
-    return tech, operadora
+    banda = _normaliza_banda(parts[2] if len(parts) > 2 else "", tech)
+    return tech, operadora, banda
 
 
 def bat_csv_para_pct(valor) -> float:
@@ -192,6 +210,7 @@ def enriquecer_csv(df: pd.DataFrame) -> pd.DataFrame:
         p = df["networkinfo"].apply(parse_networkinfo)
         df["_tech"] = p.apply(lambda x: x[0])
         df["_operadora"] = p.apply(lambda x: x[1])
+        df["_banda"] = p.apply(lambda x: x[2])
     if "internalbatterylevel" in df.columns:
         df["_bateria_pct_csv"] = df["internalbatterylevel"].apply(bat_csv_para_pct)
     if "datetime_module" in df.columns and "datetime_server" in df.columns:
@@ -204,7 +223,7 @@ def enriquecer_csv(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ── Fusão XLS + CSV ───────────────────────────────────────────────────────────
-COLS_TEC_CSV = ["_tech", "_operadora", "_latencia_s", "satellitenumber",
+COLS_TEC_CSV = ["_tech", "_operadora", "_banda", "_latencia_s", "satellitenumber",
                 "hdop", "vdop", "sdop", "altitude", "heading", "transmissiontype",
                 "networktype", "bufferstatus", "_movimento", "_bateria_pct_csv", "voltage"]
 
