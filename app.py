@@ -46,7 +46,7 @@ with st.sidebar:
     raio3 = st.number_input("Raio 3 (km)", value=5.0, step=0.5, min_value=0.1)
     st.markdown("---")
     botao_sair()
-    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.7</span>',
+    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.8</span>',
                 unsafe_allow_html=True)
 
 # ── AJUDA RÁPIDA ──────────────────────────────────────────────────────────────
@@ -55,29 +55,55 @@ with st.expander("❓ Primeira vez aqui? Veja como usar a plataforma"):
 
 # ── UPLOAD ────────────────────────────────────────────────────────────────────
 sec("01 · Importar Arquivos")
-st.caption("Envie o **CSV** (log técnico) e/ou o **XLS** (posição convertida) de cada "
+st.caption("Envie o **CSV** (log técnico), o **XLS** (posição) e/ou o **KML** (raio) de cada "
            "rastreador. Arquivos com o mesmo nome (extensão diferente) são unidos automaticamente. "
-           "Pode subir só um dos dois — o app mostra o que for possível com o que tiver.")
+           "Pode subir só parte deles — o app mostra o que for possível com o que tiver.")
+
+# Fonte de dados: upload manual OU carregado do histórico (Drive)
+import io as _io
+from services import historico as hist
+
+# Se o usuário escolheu abrir um item do histórico, os bytes ficam em session_state
+fonte_bytes = st.session_state.get("hist_arquivos")  # dict {nome: bytes} ou None
+fonte_label = st.session_state.get("hist_label")
+
 arquivos = st.file_uploader("Arquivos dos rastreadores",
     type=["csv", "xls", "xlsx", "kml"], accept_multiple_files=True)
 
-if not arquivos:
-    st.info("⬆️  Envie os arquivos (CSV, XLS e/ou KML) para iniciar a análise. "
-            "Abra o guia acima se for sua primeira vez.")
+if fonte_bytes:
+    st.success(f"📂 Carregado do histórico: **{fonte_label}**  ·  {len(fonte_bytes)} arquivo(s). "
+               "Para voltar ao envio manual, use o botão abaixo.")
+    if st.button("↩ Limpar e enviar manualmente"):
+        st.session_state.pop("hist_arquivos", None)
+        st.session_state.pop("hist_label", None)
+        st.rerun()
+
+# Monta dict unificado {nome: bytes} a partir do upload ou do histórico
+arquivos_bytes = {}
+if arquivos:
+    for arq in arquivos:
+        arquivos_bytes[arq.name] = arq.getvalue()
+elif fonte_bytes:
+    arquivos_bytes = dict(fonte_bytes)
+
+if not arquivos_bytes:
+    st.info("⬆️  Envie os arquivos (CSV, XLS e/ou KML) ou abra um relatório salvo na aba **Histórico**.")
     st.stop()
 
 # Agrupa por nome-base
 grupos = {}
-for arq in arquivos:
-    base = nome_base(arq.name)
-    ext = arq.name.lower().rsplit(".", 1)[-1]
+for nome_arq, conteudo in arquivos_bytes.items():
+    base = nome_base(nome_arq)
+    ext = nome_arq.lower().rsplit(".", 1)[-1]
     grupos.setdefault(base, {"csv": None, "xls": None, "kml": None})
+    bio = _io.BytesIO(conteudo)
+    bio.name = nome_arq
     if ext == "csv":
-        grupos[base]["csv"] = arq
+        grupos[base]["csv"] = bio
     elif ext == "kml":
-        grupos[base]["kml"] = arq
+        grupos[base]["kml"] = bio
     else:  # xls, xlsx
-        grupos[base]["xls"] = arq
+        grupos[base]["xls"] = bio
 
 # Consolida cada equipamento
 dados = []
@@ -90,6 +116,9 @@ for base, fontes in grupos.items():
         st.error(str(e))
 if not dados:
     st.stop()
+
+# Guarda os bytes originais para permitir salvar no histórico depois
+st.session_state["arquivos_bytes_atuais"] = arquivos_bytes
 
 # ── TABELA DE ARQUIVOS ────────────────────────────────────────────────────────
 sec("02 · Equipamentos Carregados")
@@ -167,7 +196,7 @@ if vazios:
 # ── ABAS ──────────────────────────────────────────────────────────────────────
 abas = st.tabs(["📊 Visão Geral", "🗺 Mapa", "📍 Precisão GPS", "🎯 Raio do Sistema",
     "📶 Rede & Operadora", "🛰 Qualidade GPS", "🚗 Movimento", "🔋 Bateria", "⏱ Latência",
-    "📋 Dados & Export", "❓ Como Usar"])
+    "📋 Dados & Export", "💾 Histórico", "❓ Como Usar"])
 
 with abas[0]: g.aba_visao_geral(resultados, df_ref, ref_nome, raios)
 with abas[1]: g.aba_mapa(resultados, df_ref, ref_nome)
@@ -178,7 +207,7 @@ with abas[5]: g.aba_qualidade_gps(df_ref, ref_nome, comparacao, dados)
 with abas[6]: g.aba_movimento(df_ref, ref_nome, comparacao, dados)
 with abas[7]: g.aba_bateria(df_ref, ref_nome, comparacao, dados)
 with abas[8]: g.aba_latencia(df_ref, ref_nome, comparacao, dados)
-with abas[10]: render_ajuda()
+with abas[11]: render_ajuda()
 
 with abas[9]:
     sec("Exportar Análise Completa")
@@ -215,3 +244,71 @@ with abas[9]:
     cols = [c for c in item["df"].columns if not c.startswith("_")]
     st.dataframe(item["df"][cols].head(1000), use_container_width=True, hide_index=True)
     st.caption(f"Fonte: {item['fonte']} · até 1000 de {len(item['df'])} registros · PIN {item['pin']}")
+
+# ── ABA HISTÓRICO ─────────────────────────────────────────────────────────────
+with abas[10]:
+    sec("Histórico de Relatórios")
+    if not hist.disponivel():
+        st.info(
+            "📂 O histórico permite **salvar** os arquivos de uma análise no Google Drive "
+            "e **reabrir** depois, sem precisar enviá-los de novo — útil para compartilhar "
+            "com a equipe.\n\n"
+            "Para ativar, é necessário configurar as credenciais do Google Drive "
+            "(conta de serviço) em *Settings → Secrets* no Streamlit Cloud. "
+            "Enquanto não estiver configurado, esta aba fica indisponível, mas todo o "
+            "restante do app funciona normalmente.")
+    else:
+        # Salvar a análise atual
+        st.markdown("**💾 Salvar esta análise no histórico**")
+        cS1, cS2 = st.columns(2)
+        with cS1:
+            projeto = st.text_input("Projeto", placeholder="Ex.: Homologação RI720 2026")
+        with cS2:
+            rota = st.text_input("Rota", placeholder="Ex.: Campinas → Sumaré")
+        if st.button("💾  Salvar no histórico"):
+            ab = st.session_state.get("arquivos_bytes_atuais") or {}
+            if not ab:
+                st.warning("Nenhum arquivo carregado para salvar.")
+            elif not (projeto.strip() or rota.strip()):
+                st.warning("Informe ao menos o nome do projeto ou da rota.")
+            else:
+                try:
+                    with st.spinner("Enviando arquivos ao Google Drive..."):
+                        hist.salvar(projeto, rota, ab)
+                    st.success("Análise salva no histórico com sucesso.")
+                except Exception as e:
+                    st.error(f"Falha ao salvar: {e}")
+
+        st.markdown("---")
+        st.markdown("**📁 Abrir uma análise salva**")
+        busca = st.text_input("Pesquisar por projeto ou rota", key="busca_hist")
+        if st.button("🔄  Atualizar lista") or "hist_lista" not in st.session_state:
+            try:
+                st.session_state["hist_lista"] = hist.listar()
+            except Exception as e:
+                st.error(f"Falha ao listar: {e}")
+                st.session_state["hist_lista"] = []
+        itens = st.session_state.get("hist_lista", [])
+        if busca.strip():
+            b = busca.lower()
+            itens = [it for it in itens
+                     if b in it["projeto"].lower() or b in it["rota_pasta"].lower()]
+        if not itens:
+            st.caption("Nenhuma análise salva encontrada.")
+        for it in itens:
+            cI1, cI2 = st.columns([4, 1])
+            with cI1:
+                st.markdown(f"**{it['projeto']}** · {it['rota_pasta']}")
+            with cI2:
+                if st.button("Abrir", key=f"open_{it['pasta_id']}"):
+                    try:
+                        with st.spinner("Baixando arquivos do Drive..."):
+                            arqs = hist.baixar_arquivos(it["pasta_id"])
+                        st.session_state["hist_arquivos"] = arqs
+                        st.session_state["hist_label"] = f"{it['projeto']} · {it['rota_pasta']}"
+                        # Limpa resultados antigos para reprocessar com os novos arquivos
+                        for k in ("resultados", "ref_df", "comparacao", "df_resumo"):
+                            st.session_state.pop(k, None)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Falha ao abrir: {e}")
