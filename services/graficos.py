@@ -378,6 +378,26 @@ def _rede_um(df_raw, titulo, df_prec=None, kid="x", expandir=False):
                 text=nt.values, textposition="outside"))
             fig.update_layout(title="Network Type (LTE / GSM / ...)", showlegend=False)
             st.plotly_chart(aplica_tema(fig, 240), use_container_width=True, key=f"bnt_{kid}")
+        # Frequência por banda do modem (GSM850/900/1800/1900, LTE B3/B5/B7/B28...)
+        if "_banda" in df_raw.columns and (df_raw["_banda"] != "—").any():
+            st.markdown("**📡 Frequência / Banda do modem**")
+            dfb = df_raw[df_raw["_banda"] != "—"]
+            banda_counts = dfb["_banda"].value_counts()
+            base_b = len(dfb)
+            # cor por geração: LTE azul, GSM laranja, demais cinza
+            cores_b = ["#2477b3" if b.startswith("LTE") else
+                       "#e08a1e" if b.startswith("GSM") else "#7c5cd0"
+                       for b in banda_counts.index]
+            fig = go.Figure(go.Bar(
+                x=banda_counts.index, y=banda_counts.values, marker_color=cores_b,
+                text=[f"{v}<br>{v/base_b*100:.1f}%" for v in banda_counts.values],
+                textposition="outside"))
+            fig.update_layout(title="Registros por Banda de Frequência", showlegend=False)
+            st.plotly_chart(aplica_tema(fig, 280), use_container_width=True, key=f"bband_{kid}")
+            tabb = pd.DataFrame({
+                "Banda": banda_counts.index, "Registros": banda_counts.values,
+                "%": (banda_counts.values / base_b * 100).round(1)})
+            st.dataframe(tabb, use_container_width=True, hide_index=True)
         if df_prec is not None and "_tech_comp" in df_prec.columns and len(df_prec) > 0:
             dfb = df_prec[["_tech_comp", "distancia_km"]].dropna()
             if len(dfb) > 0:
