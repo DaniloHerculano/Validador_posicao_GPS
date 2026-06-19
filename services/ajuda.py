@@ -182,7 +182,7 @@ Repita o padrão para cada rastreador (mesmo nome-base, extensões `.csv`, `.xls
 | **Mapa** | Pontos no mapa + linhas de erro + calor | XLS (posição) |
 | **Precisão GPS** | Erro em km, % por raio, endereços de maior erro | XLS (posição) |
 | **Raio do Sistema** | % de pontos dentro do raio que o sistema informa | KML + XLS |
-| **Rede & Operadora** | 2G/3G/4G, operadora, UDP/SMS | CSV (técnico) |
+| **Rede & Operadora** | 2G/3G/4G, operadora, banda/frequência, UDP/SMS | CSV (técnico) |
 | **Qualidade GPS** | Satélites, DOP, altitude | CSV (técnico) |
 | **Movimento** | Velocidade, direção, sensor | CSV + XLS |
 | **Bateria** | Nível e consumo | XLS ou CSV |
