@@ -92,3 +92,7 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
 - Mapa: opção de exibir o **raio do sistema** (círculo de incerteza do KML) ao redor das amostras estimadas, habilitável/desabilitável **por equipamento**.
 - Mapa: opção de **destacar em vermelho** as amostras que ficaram fora do raio do sistema.
 - Círculo geodésico com erro de aproximação < 0,3%.
+
+## v0.8
+- Rede: análise de **frequência/banda do modem** (GSM850/900/1800/1900, LTE B3/B5/B7/B28...), com % por banda — útil para avaliar desempenho do modem em 2G e 4G.
+- **Histórico de relatórios** via Google Drive: salvar os arquivos originais (CSV/XLS/KML) sob Projeto/Rota e reabrir depois (qualquer usuário logado). Requer configurar credenciais de conta de serviço do Google em st.secrets; sem isso, a aba exibe instruções e o restante do app funciona normalmente.
