@@ -253,10 +253,8 @@ with abas[10]:
             "📂 O histórico permite **salvar** os arquivos de uma análise no Google Drive "
             "e **reabrir** depois, sem precisar enviá-los de novo — útil para compartilhar "
             "com a equipe.\n\n"
-            "Para ativar, é necessário configurar as credenciais do Google Drive "
-            "(conta de serviço) em *Settings → Secrets* no Streamlit Cloud. "
-            "Enquanto não estiver configurado, esta aba fica indisponível, mas todo o "
-            "restante do app funciona normalmente.")
+            "PEGADINHA DO MALANDRO... Função não disponível"
+          
     else:
         # Salvar a análise atual
         st.markdown("**💾 Salvar esta análise no histórico**")
