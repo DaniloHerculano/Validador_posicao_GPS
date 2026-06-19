@@ -253,7 +253,7 @@ with abas[10]:
             "📂 O histórico permite **salvar** os arquivos de uma análise no Google Drive "
             "e **reabrir** depois, sem precisar enviá-los de novo — útil para compartilhar "
             "com a equipe.\n\n"
-            "PEGADINHA DO MALANDRO... Função não disponível"
+            "PEGADINHA DO MALANDRO... Função não disponível.")
           
     else:
         # Salvar a análise atual
