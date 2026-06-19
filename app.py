@@ -251,9 +251,9 @@ with abas[10]:
     if not hist.disponivel():
         st.info(
             "📂 O histórico permite **salvar** os arquivos de uma análise no Google Drive "
-            "e **reabrir** depois, sem precisar enviá-los de novo — útil para compartilhar "
+            "e **reabrir** depois, sem precisar enviá-los de novo"
             "com a equipe.\n\n"
-            "PEGADINHA DO MALANDRO... Função não disponível.")
+            "PEGADINHA DO MALANDRO... Função não disponível no momento!")
           
     else:
         # Salvar a análise atual
