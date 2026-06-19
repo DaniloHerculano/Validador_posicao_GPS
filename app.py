@@ -1,314 +1,227 @@
 """
-app.py — Validador de Posicionamento (Stoneridge Brasil)
-Aceita CSV (log técnico) e XLS (posição estimada convertida) por equipamento,
-funde as duas fontes e gera análise comparativa completa.
+ajuda.py — Conteúdo da seção "Como usar" exibida na plataforma.
 """
+import base64
+from pathlib import Path
 import streamlit as st
+from services.ui import sec
 
-st.set_page_config(page_title="Validador de Posicionamento", page_icon="📡",
-                   layout="wide", initial_sidebar_state="expanded")
+_ASSETS = Path(__file__).parent.parent / "assets"
 
-from services.ui import carregar_css, sec, badge, logo_sidebar
-from services.config import SR_RED
-from services.loader import consolidar_equipamento, nome_base, extrair_pin, extrair_modelo
-from services.analise import sincronizar
-from services.export import gerar_excel, nome_arquivo_seguro
-from services.ajuda import render_ajuda, HELP_CSS
-from services.auth import exigir_login, botao_sair
-from services import graficos as g
-import pandas as pd
 
-carregar_css()
+def _img_b64(nome: str) -> str:
+    caminho = _ASSETS / nome
+    if caminho.exists():
+        return base64.b64encode(caminho.read_bytes()).decode()
+    return ""
 
-# Gate de acesso — exige login antes de qualquer conteúdo
-exigir_login()
 
-st.markdown(HELP_CSS, unsafe_allow_html=True)
+def _print_passo(nome_arquivo: str, legenda: str, estreito: bool = False):
+    """Exibe um print de passo com moldura e legenda.
+    estreito=True para imagens verticais/quadradas (limita largura e centraliza)."""
+    b64 = _img_b64(nome_arquivo)
+    if not b64:
+        return
+    classe = "print-step print-step-narrow" if estreito else "print-step"
+    st.markdown(
+        f'<div class="{classe}">'
+        f'<img src="data:image/png;base64,{b64}" alt="{legenda}"/>'
+        f'<div class="print-cap">{legenda}</div></div>',
+        unsafe_allow_html=True)
 
-st.markdown("""
-<div class="hero-wrap"><div class="hero-bar"></div><div>
-<div class="hero-title">TESTE DE RODAGEM</div>
-<div class="hero-sub">Análise comparativa GPS Real × Posição Estimada · Stoneridge Brasil</div>
-</div></div>""", unsafe_allow_html=True)
 
-# ── SIDEBAR ───────────────────────────────────────────────────────────────────
-with st.sidebar:
-    logo_sidebar()
-    st.markdown("### ⚙️ Parâmetros")
-    st.markdown("---")
-    tolerancia = st.number_input("Tolerância de horário (min)", 1, 60, 10, 1,
-        help="Janela máxima para parear referência × comparado")
-    tol_fusao = st.number_input("Tolerância de fusão CSV↔XLS (s)", 5, 300, 60, 5,
-        help="Janela para casar o log técnico (CSV) ao ponto de posição (XLS)")
-    st.markdown("**Raios de precisão (km)**")
-    raio1 = st.number_input("Raio 1 (km)", value=1.0, step=0.5, min_value=0.1)
-    raio2 = st.number_input("Raio 2 (km)", value=3.0, step=0.5, min_value=0.1)
-    raio3 = st.number_input("Raio 3 (km)", value=5.0, step=0.5, min_value=0.1)
-    st.markdown("---")
-    botao_sair()
-    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.8</span>',
-                unsafe_allow_html=True)
+def render_ajuda():
+    sec("Como usar a plataforma")
 
-# ── AJUDA RÁPIDA ──────────────────────────────────────────────────────────────
-with st.expander("❓ Primeira vez aqui? Veja como usar a plataforma"):
-    render_ajuda()
+    st.markdown("""
+Esta ferramenta compara a posição de rastreadores com **GPS ligado** (posição real)
+contra rastreadores com **GPS desligado** (posição estimada por antena de celular),
+medindo o quão distante a estimativa ficou da referência real — e ainda valida se a
+posição caiu **dentro do raio de incerteza que o próprio sistema** informa.
+""")
 
-# ── UPLOAD ────────────────────────────────────────────────────────────────────
-sec("01 · Importar Arquivos")
-st.caption("Envie o **CSV** (log técnico), o **XLS** (posição) e/ou o **KML** (raio) de cada "
-           "rastreador. Arquivos com o mesmo nome (extensão diferente) são unidos automaticamente. "
-           "Pode subir só parte deles — o app mostra o que for possível com o que tiver.")
+    # ── Os três relatórios ──
+    st.markdown("#### 📑 Os relatórios de cada rastreador")
+    st.markdown("""
+Cada equipamento gera relatórios que se complementam. Você pode subir os três
+(análise completa) ou apenas os que tiver — o app usa o que estiver disponível.
+""")
 
-# Fonte de dados: upload manual OU carregado do histórico (Drive)
-import io as _io
-from services import historico as hist
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown("""
+<div class="help-card">
+<div class="help-card-tag">.CSV</div>
+<div class="help-card-title">Log Técnico</div>
+<p>Rede (2G/3G/4G), operadora, satélites, DOP, latência, transmissão (UDP/SMS)
+e bateria bruta.</p>
+<p><b>Onde baixar:</b><br>
+<a href="http://websites01.positronrt.cloud/firmware/index.php?tipoparametro=diversosplanform" target="_blank">
+Portal de Firmware / Diversos</a></p>
+</div>
+""", unsafe_allow_html=True)
+    with c2:
+        st.markdown("""
+<div class="help-card">
+<div class="help-card-tag">.XLS</div>
+<div class="help-card-title">Relatório de Posição</div>
+<p>Latitude/longitude (real <b>ou</b> estimada), endereço ("Próximo a:"),
+posição estimada, validade do GPS e bateria em %.</p>
+<p><b>Onde baixar:</b><br>
+<a href="https://sso.pst.com.br/sso/" target="_blank">Portal SSO / PST</a></p>
+</div>
+""", unsafe_allow_html=True)
+    with c3:
+        st.markdown("""
+<div class="help-card">
+<div class="help-card-tag">.KML</div>
+<div class="help-card-title">Raio do Sistema</div>
+<p>Além da posição, traz o <b>raio de incerteza</b> que o próprio sistema calcula
+para cada posição estimada. Usado para validar o sistema PST.</p>
+<p><b>Onde baixar:</b><br>
+<a href="https://sso.pst.com.br/sso/" target="_blank">Portal SSO / PST</a> (mesmo
+local do XLS, opção exportar KML)</p>
+</div>
+""", unsafe_allow_html=True)
 
-# Se o usuário escolheu abrir um item do histórico, os bytes ficam em session_state
-fonte_bytes = st.session_state.get("hist_arquivos")  # dict {nome: bytes} ou None
-fonte_label = st.session_state.get("hist_label")
+    # ── Prints: onde extrair cada arquivo ──
+    st.markdown("#### 📸 Onde extrair cada arquivo (passo a passo)")
 
-arquivos = st.file_uploader("Arquivos dos rastreadores",
-    type=["csv", "xls", "xlsx", "kml"], accept_multiple_files=True)
+    st.markdown("**CSV — [Portal de Firmware (Positron)]"
+                "(http://websites01.positronrt.cloud/firmware/index.php?tipoparametro=diversosplanform):** "
+                "acesse **Upload de arquivo → Diversos → Planilhas de Testes** (1, 2), "
+                "escolha o tipo de consulta **\"Consulta carga posições e status\"** (3), "
+                "informe o PIN e o período em UTC (4) e clique em **Consultar** (5).")
+    _print_passo("config_websites01.png",
+                 "Portal de Firmware — geração da planilha CSV (Planilhas de Testes)",
+                 estreito=True)
 
-if fonte_bytes:
-    st.success(f"📂 Carregado do histórico: **{fonte_label}**  ·  {len(fonte_bytes)} arquivo(s). "
-               "Para voltar ao envio manual, use o botão abaixo.")
-    if st.button("↩ Limpar e enviar manualmente"):
-        st.session_state.pop("hist_arquivos", None)
-        st.session_state.pop("hist_label", None)
-        st.rerun()
+    st.markdown("**XLS e KML — [Portal SSO/PST](https://sso.pst.com.br/sso/):** "
+                "na busca (1), marque **Localização** e "
+                "**Posições estimadas** (2, 3), defina data/hora inicial e final e clique "
+                "em **Consultar** (4).")
+    _print_passo("config_sso.png",
+                 "Portal SSO/PST — filtro de consulta (Localização + Posições estimadas)")
 
-# Monta dict unificado {nome: bytes} a partir do upload ou do histórico
-arquivos_bytes = {}
-if arquivos:
-    for arq in arquivos:
-        arquivos_bytes[arq.name] = arq.getvalue()
-elif fonte_bytes:
-    arquivos_bytes = dict(fonte_bytes)
+    st.markdown("Na aba **Resultado**, use **Exportar XLS** (1) para o relatório de posição "
+                "e **Exportar KML** (2) para obter o arquivo com o raio do sistema.")
+    _print_passo("download_xls_kml_sso.png",
+                 "Portal SSO/PST — exportação do XLS e do KML")
 
-if not arquivos_bytes:
-    st.info("⬆️  Envie os arquivos (CSV, XLS e/ou KML) ou abra um relatório salvo na aba **Histórico**.")
-    st.stop()
+    # ── Por que dois ──
+    st.markdown("#### 🔗 Por que vários relatórios?")
+    st.markdown("""
+O **CSV** sabe *como* o equipamento está se comunicando (rede, sinal, bateria), mas
+quando o GPS está desligado ele **não traz a coordenada pronta** — só o código da
+torre de celular usada.
 
-# Agrupa por nome-base
-grupos = {}
-for nome_arq, conteudo in arquivos_bytes.items():
-    base = nome_base(nome_arq)
-    ext = nome_arq.lower().rsplit(".", 1)[-1]
-    grupos.setdefault(base, {"csv": None, "xls": None, "kml": None})
-    bio = _io.BytesIO(conteudo)
-    bio.name = nome_arq
-    if ext == "csv":
-        grupos[base]["csv"] = bio
-    elif ext == "kml":
-        grupos[base]["kml"] = bio
-    else:  # xls, xlsx
-        grupos[base]["xls"] = bio
+O **XLS** é gerado por um sistema que converte essa torre em latitude/longitude
+(a posição estimada com o endereço "Próximo a:"). É a fonte confiável de **onde** o
+equipamento está.
 
-# Consolida cada equipamento
-dados = []
-for base, fontes in grupos.items():
-    try:
-        info = consolidar_equipamento(base, fontes["csv"], fontes["xls"],
-                                      kml_file=fontes["kml"], tol_fusao=tol_fusao)
-        dados.append(info)
-    except Exception as e:
-        st.error(str(e))
-if not dados:
-    st.stop()
+Por isso o app **une as fontes por horário**: usa a posição e a bateria do XLS,
+enriquece cada ponto com os dados técnicos do CSV, e associa o raio de incerteza
+do KML — tudo pelo horário mais próximo.
+""")
 
-# Guarda os bytes originais para permitir salvar no histórico depois
-st.session_state["arquivos_bytes_atuais"] = arquivos_bytes
+    # ── O KML e o raio ──
+    st.markdown("#### 🎯 O KML e o raio do sistema")
+    st.markdown("""
+O **KML** (extraído do portal SSO/PST, no mesmo local do XLS) contém, para cada
+posição estimada, o **raio de incerteza** que o próprio sistema calcula — no arquivo
+aparece como, por exemplo, `Raio: 3012.0` (em metros; o app converte para km).
 
-# ── TABELA DE ARQUIVOS ────────────────────────────────────────────────────────
-sec("02 · Equipamentos Carregados")
-rows = "".join(
-    f"<tr><td style='font-family:Barlow Condensed'>{d['modelo']}</td>"
-    f"<td style='font-family:Barlow Condensed;color:{SR_RED};font-weight:700'>{d['pin']}</td>"
-    f"<td style='font-size:.78rem;color:#6b7f8f'>{d['arquivo']}</td>"
-    f"<td>{badge(d['tipo'])}</td>"
-    f"<td style='font-family:Barlow Condensed;color:#6b7f8f'>{d['fonte']}</td>"
-    f"<td style='text-align:right;font-family:Barlow Condensed'>{d['registros']:,}</td></tr>"
-    for d in dados)
-st.markdown(f'<table class="file-table"><thead><tr><th>Modelo</th><th>PIN</th>'
-    f'<th>Arquivo</th><th>Tipo</th><th>Fonte</th><th style="text-align:right">Registros</th></tr></thead>'
-    f'<tbody>{rows}</tbody></table>', unsafe_allow_html=True)
+Esse raio representa a área onde o sistema afirma que o rastreador deveria estar.
+A aba **Raio do Sistema** verifica, no mesmo horário já analisado, se a posição real
+(da referência) caiu **dentro desse raio** — informando o percentual de acerto do
+próprio sistema. É uma forma de validar o sistema de geolocalização atual.
 
-# ── SELEÇÃO ───────────────────────────────────────────────────────────────────
-sec("03 · Configurar Comparação")
-def rotulo(d):
-    # O nome do arquivo (chave do agrupamento) e sempre unico e ja costuma
-    # conter o modelo; garante que dois equipamentos nunca colidam no seletor.
-    if d["pin"] and d["pin"] != "N/A":
-        return f"{d['arquivo']}  ·  PIN {d['pin']}"
-    return d["arquivo"]
-mapa_rotulo = {rotulo(d): d["arquivo"] for d in dados}
+> Sem o KML, todas as demais análises continuam funcionando; apenas a validação
+> contra o raio do sistema fica indisponível.
+""")
 
-reais = [rotulo(d) for d in dados if d["tipo"] == "GPS Real"]
-todos = [rotulo(d) for d in dados]
-cand = reais if reais else todos
+    # ── Exemplo de nomes ──
+    st.markdown("#### 📁 Como nomear os arquivos")
+    st.markdown("""
+Os arquivos de um mesmo rastreador devem ter o **mesmo nome**, mudando apenas a
+**extensão**. Assim o app agrupa as fontes automaticamente. Exemplo para um
+equipamento:
+""")
+    st.code(
+        "RI130_623721833_GNSS_1_29_05-01_06.csv   ← log técnico\n"
+        "RI130_623721833_GNSS_1_29_05-01_06.xls   ← posição\n"
+        "RI130_623721833_GNSS_1_29_05-01_06.kml   ← raio do sistema",
+        language="text")
+    st.markdown("""
+Repita o padrão para cada rastreador (mesmo nome-base, extensões `.csv`, `.xls`,
+`.kml`). Não é obrigatório ter as três — suba as que tiver.
+""")
 
-cR, cC = st.columns([1, 2])
-with cR:
-    ref_rot = st.selectbox("🔵 Referência (GPS Real)", cand,
-        help="Rastreador com GPS ligado — geralmente o RI130")
-with cC:
-    opc = [r for r in todos if r != ref_rot]
-    comp_rot = st.multiselect("🟠 Comparar com", opc, default=opc)
+    # ── Passo a passo ──
+    st.markdown("#### 🚀 Passo a passo")
+    st.markdown("""
+1. **Baixe os relatórios** de cada rastreador (CSV no portal de firmware; XLS e KML
+   no portal SSO/PST).
+2. **Mantenha o mesmo nome** para os arquivos do mesmo equipamento — só muda a
+   extensão (`.csv`, `.xls`, `.kml`). O app os une automaticamente.
+3. **Suba os arquivos** na seção *Importar Arquivos*.
+4. **Escolha a referência** (o rastreador com GPS ligado, normalmente o RI130) e
+   marque quais comparar.
+5. **Ajuste na barra lateral** a tolerância de horário e os raios de precisão
+   (1 / 3 / 5 km, editáveis).
+6. Clique em **Iniciar Análise Completa** e navegue pelas abas.
+7. Na aba **Dados & Export**, baixe o Excel com tabelas e gráficos.
+""")
 
-referencia = mapa_rotulo[ref_rot]
-comparacao = [mapa_rotulo[r] for r in comp_rot]
+    # ── O que cada aba mostra ──
+    st.markdown("#### 📊 O que cada aba mostra")
+    st.markdown("""
+| Aba | Conteúdo | Precisa de |
+|-----|----------|------------|
+| **Visão Geral** | Resumo comparativo e erro médio | XLS (posição) |
+| **Mapa** | Pontos no mapa + linhas de erro + calor | XLS (posição) |
+| **Precisão GPS** | Erro em km, % por raio, endereços de maior erro | XLS (posição) |
+| **Raio do Sistema** | % de pontos dentro do raio que o sistema informa | KML + XLS |
+| **Rede & Operadora** | 2G/3G/4G, operadora, banda/frequência, UDP/SMS | CSV (técnico) |
+| **Qualidade GPS** | Satélites, DOP, altitude | CSV (técnico) |
+| **Movimento** | Velocidade, direção, sensor | CSV + XLS |
+| **Bateria** | Nível e consumo | XLS ou CSV |
+| **Latência** | Tempo módulo→servidor, buffer | CSV (técnico) |
+""")
 
-if not comparacao:
-    st.warning("Selecione ao menos um rastreador para comparar.")
-    st.stop()
+    # ── Como o erro é medido ──
+    st.markdown("#### 📐 Como o erro é medido")
+    st.markdown("""
+A distância entre o ponto estimado e o real é a **distância geodésica** (linha reta
+sobre a curvatura da Terra, modelo WGS-84 — o mesmo do GPS). O app pareia cada ponto
+estimado com o ponto real de **horário mais próximo** (dentro da tolerância) e mede
+essa distância em km.
 
-btn = st.button("🚀  INICIAR ANÁLISE COMPLETA")
-if not btn and "resultados" not in st.session_state:
-    st.stop()
+> **Atenção:** se os equipamentos estavam em movimento, parte do erro pode ser o
+> deslocamento real do veículo entre os dois horários, não falha da estimativa. A
+> coluna `dif_seg` nos dados sincronizados mostra essa defasagem de tempo.
+""")
 
-if btn:
-    ref_item = next(d for d in dados if d["arquivo"] == referencia)
-    df_ref = ref_item["df"].copy()
-    resultados = {}
-    with st.spinner("Sincronizando e calculando distâncias..."):
-        for nome in comparacao:
-            item = next(d for d in dados if d["arquivo"] == nome)
-            resultados[nome] = sincronizar(df_ref, item["df"].copy(), tolerancia)
-    st.session_state.update({"resultados": resultados, "ref_nome": referencia,
-        "ref_df": df_ref, "comparacao": comparacao, "raios": (raio1, raio2, raio3),
-        "dados_meta": {d["arquivo"]: {k: d[k] for k in ("modelo","pin","tipo","fonte")} for d in dados}})
+    st.caption("Stoneridge Brasil · Validador de Posicionamento")
 
-resultados = st.session_state.get("resultados", {})
-df_ref = st.session_state.get("ref_df", pd.DataFrame())
-comparacao = st.session_state.get("comparacao", [])
-raios = st.session_state.get("raios", (1.0, 3.0, 5.0))
-ref_nome = st.session_state.get("ref_nome", "")
-if not resultados:
-    st.stop()
 
-# Avisos sobre sincronizações vazias
-vazios = [n for n, r in resultados.items() if len(r) == 0]
-if vazios:
-    st.warning("Sem sincronização para: " + ", ".join(vazios) +
-               ". Verifique se há sobreposição de horário ou aumente a tolerância.")
-
-# ── ABAS ──────────────────────────────────────────────────────────────────────
-abas = st.tabs(["📊 Visão Geral", "🗺 Mapa", "📍 Precisão GPS", "🎯 Raio do Sistema",
-    "📶 Rede & Operadora", "🛰 Qualidade GPS", "🚗 Movimento", "🔋 Bateria", "⏱ Latência",
-    "📋 Dados & Export", "💾 Histórico", "❓ Como Usar"])
-
-with abas[0]: g.aba_visao_geral(resultados, df_ref, ref_nome, raios)
-with abas[1]: g.aba_mapa(resultados, df_ref, ref_nome)
-with abas[2]: g.aba_precisao(resultados, raios)
-with abas[3]: g.aba_raio_sistema(resultados)
-with abas[4]: g.aba_rede(resultados, df_ref, ref_nome, comparacao, dados)
-with abas[5]: g.aba_qualidade_gps(df_ref, ref_nome, comparacao, dados)
-with abas[6]: g.aba_movimento(df_ref, ref_nome, comparacao, dados)
-with abas[7]: g.aba_bateria(df_ref, ref_nome, comparacao, dados)
-with abas[8]: g.aba_latencia(df_ref, ref_nome, comparacao, dados)
-with abas[11]: render_ajuda()
-
-with abas[9]:
-    sec("Exportar Análise Completa")
-    st.caption("Excel com Resumo, dados sincronizados por equipamento e consolidado Rede & Bateria.")
-    df_resumo = st.session_state.get("df_resumo")
-    cE1, cE2 = st.columns(2)
-    with cE1:
-        st.download_button("📥  Baixar Excel Completo (.xlsx)",
-            data=gerar_excel(df_resumo, resultados, dados, raios=raios),
-            file_name="analise_posicionamento.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="dl_excel")
-    with cE2:
-        if df_resumo is not None:
-            st.download_button("📥  Baixar Resumo (.csv)",
-                data=df_resumo.to_csv(index=False).encode("utf-8"),
-                file_name="resumo_posicionamento.csv", mime="text/csv", key="dl_csv")
-
-    sec("Registros Sincronizados")
-    for nome, df in resultados.items():
-        st.markdown(f"**{nome}** — {len(df)} sincronizações")
-        if len(df) > 0:
-            st.dataframe(df, use_container_width=True, hide_index=True)
-            st.download_button(f"📥 CSV — {nome}",
-                data=df.to_csv(index=False).encode("utf-8"),
-                file_name=f"sync_{nome_arquivo_seguro(nome)}.csv",
-                mime="text/csv", key=f"dlc_{nome}")
-        else:
-            st.warning("Sem registros sincronizados.")
-
-    sec("Dados Consolidados por Equipamento")
-    sel = st.selectbox("Equipamento", [d["arquivo"] for d in dados], key="sel_bruto")
-    item = next(d for d in dados if d["arquivo"] == sel)
-    cols = [c for c in item["df"].columns if not c.startswith("_")]
-    st.dataframe(item["df"][cols].head(1000), use_container_width=True, hide_index=True)
-    st.caption(f"Fonte: {item['fonte']} · até 1000 de {len(item['df'])} registros · PIN {item['pin']}")
-
-# ── ABA HISTÓRICO ─────────────────────────────────────────────────────────────
-with abas[10]:
-    sec("Histórico de Relatórios")
-    if not hist.disponivel():
-        st.info(
-            "📂 O histórico permite **salvar** os arquivos de uma análise no Google Drive "
-            "e **reabrir** depois, sem precisar enviá-los de novo — útil para compartilhar "
-            "com a equipe.\n\n"
-            "Para ativar, é necessário configurar as credenciais do Google Drive "
-            "(conta de serviço) em *Settings → Secrets* no Streamlit Cloud. "
-            "Enquanto não estiver configurado, esta aba fica indisponível, mas todo o "
-            "restante do app funciona normalmente.")
-    else:
-        # Salvar a análise atual
-        st.markdown("**💾 Salvar esta análise no histórico**")
-        cS1, cS2 = st.columns(2)
-        with cS1:
-            projeto = st.text_input("Projeto", placeholder="Ex.: Homologação RI720 2026")
-        with cS2:
-            rota = st.text_input("Rota", placeholder="Ex.: Campinas → Sumaré")
-        if st.button("💾  Salvar no histórico"):
-            ab = st.session_state.get("arquivos_bytes_atuais") or {}
-            if not ab:
-                st.warning("Nenhum arquivo carregado para salvar.")
-            elif not (projeto.strip() or rota.strip()):
-                st.warning("Informe ao menos o nome do projeto ou da rota.")
-            else:
-                try:
-                    with st.spinner("Enviando arquivos ao Google Drive..."):
-                        hist.salvar(projeto, rota, ab)
-                    st.success("Análise salva no histórico com sucesso.")
-                except Exception as e:
-                    st.error(f"Falha ao salvar: {e}")
-
-        st.markdown("---")
-        st.markdown("**📁 Abrir uma análise salva**")
-        busca = st.text_input("Pesquisar por projeto ou rota", key="busca_hist")
-        if st.button("🔄  Atualizar lista") or "hist_lista" not in st.session_state:
-            try:
-                st.session_state["hist_lista"] = hist.listar()
-            except Exception as e:
-                st.error(f"Falha ao listar: {e}")
-                st.session_state["hist_lista"] = []
-        itens = st.session_state.get("hist_lista", [])
-        if busca.strip():
-            b = busca.lower()
-            itens = [it for it in itens
-                     if b in it["projeto"].lower() or b in it["rota_pasta"].lower()]
-        if not itens:
-            st.caption("Nenhuma análise salva encontrada.")
-        for it in itens:
-            cI1, cI2 = st.columns([4, 1])
-            with cI1:
-                st.markdown(f"**{it['projeto']}** · {it['rota_pasta']}")
-            with cI2:
-                if st.button("Abrir", key=f"open_{it['pasta_id']}"):
-                    try:
-                        with st.spinner("Baixando arquivos do Drive..."):
-                            arqs = hist.baixar_arquivos(it["pasta_id"])
-                        st.session_state["hist_arquivos"] = arqs
-                        st.session_state["hist_label"] = f"{it['projeto']} · {it['rota_pasta']}"
-                        # Limpa resultados antigos para reprocessar com os novos arquivos
-                        for k in ("resultados", "ref_df", "comparacao", "df_resumo"):
-                            st.session_state.pop(k, None)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Falha ao abrir: {e}")
+HELP_CSS = """
+<style>
+.help-card{background:#ffffff;border:1px solid #dce4ee;border-top:3px solid #dd0933;
+  border-radius:10px;padding:1.1rem 1.3rem;height:100%;box-shadow:0 1px 3px rgba(44,57,70,.05);}
+.help-card-tag{display:inline-block;background:#dd0933;color:#fff;font-family:'Barlow Condensed',sans-serif;
+  font-weight:700;font-size:.72rem;letter-spacing:.1em;padding:2px 10px;border-radius:5px;margin-bottom:.5rem;}
+.help-card-title{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.25rem;
+  color:#2c3946;margin-bottom:.5rem;}
+.help-card p{font-size:.86rem;color:#3a4a57;margin:.4rem 0;}
+.help-card a{color:#dd0933;font-weight:600;text-decoration:none;}
+.help-card a:hover{text-decoration:underline;}
+.print-step{margin:.6rem 0 1.2rem 0;border:1px solid #dce4ee;border-radius:10px;
+  overflow:hidden;background:#fff;box-shadow:0 1px 3px rgba(44,57,70,.06);}
+.print-step img{width:100%;display:block;border-bottom:1px solid #eef2f7;}
+.print-step-narrow img{max-width:380px;width:100%;margin:0 auto;border-bottom:none;}
+.print-step-narrow{text-align:center;}
+.print-step-narrow .print-cap{border-top:1px solid #eef2f7;text-align:left;}
+.print-cap{font-size:.74rem;color:#6b7f8f;padding:.5rem .8rem;background:#f9fafb;}
+</style>
+"""
