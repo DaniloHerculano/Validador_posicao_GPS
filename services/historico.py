@@ -85,3 +85,65 @@ def _baixar_bytes(svc, file_id: str) -> bytes:
         _, done = downloader.next_chunk()
     buf.seek(0)
     return buf.getvalue()
+
+
+# ── UI ────────────────────────────────────────────────────────────────────────
+def painel_historico(st_mod, expandido=False):
+    """
+    Renderiza o seletor de histórico (independe de ter arquivos carregados).
+    Ao escolher 'Abrir', coloca os bytes em session_state['hist_arquivos'] e
+    dá rerun. Pode ser chamado no topo do app, antes do upload.
+    """
+    st = st_mod
+    with st.expander("💾 Abrir um teste salvo no histórico (Google Drive)", expanded=expandido):
+        if not disponivel():
+            st.info(
+                "Esta opção lê os testes de uma **pasta pública do Google Drive**. "
+                "Cada subpasta da pasta de histórico é um teste (com CSV/XLS/KML).\n\n"
+                "Para ativar, configure em *Settings → Secrets* no Streamlit Cloud:\n"
+                "```toml\n[gdrive]\napi_key = \"SUA_API_KEY\"\nfolder_id = \"ID_DA_PASTA\"\n```\n"
+                "A pasta e suas subpastas devem estar com acesso "
+                "**\"qualquer pessoa com o link\"**.")
+            return
+
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            busca = st.text_input("Pesquisar teste por nome", key="busca_hist",
+                                  placeholder="Ex.: SP BH")
+        with c2:
+            st.write("")
+            atualizar = st.button("🔄  Atualizar", key="btn_upd_hist",
+                                  use_container_width=True)
+        if atualizar or "hist_lista" not in st.session_state:
+            try:
+                with st.spinner("Lendo pasta do Drive..."):
+                    st.session_state["hist_lista"] = listar()
+            except Exception as e:
+                st.error(f"Falha ao listar a pasta do Drive: {e}")
+                st.session_state["hist_lista"] = []
+        itens = st.session_state.get("hist_lista", [])
+        if busca.strip():
+            b = busca.lower()
+            itens = [it for it in itens if b in it["nome"].lower()]
+        if not itens:
+            st.caption("Nenhum teste encontrado na pasta do histórico.")
+        for it in itens:
+            cI1, cI2 = st.columns([4, 1])
+            with cI1:
+                st.markdown(f"📁 **{it['nome']}**")
+            with cI2:
+                if st.button("Abrir", key=f"open_{it['pasta_id']}",
+                             use_container_width=True):
+                    try:
+                        with st.spinner(f"Baixando '{it['nome']}'..."):
+                            arqs = baixar_arquivos(it["pasta_id"])
+                        if not arqs:
+                            st.warning("Esta subpasta não contém arquivos.")
+                        else:
+                            st.session_state["hist_arquivos"] = arqs
+                            st.session_state["hist_label"] = it["nome"]
+                            for k in ("resultados", "ref_df", "comparacao", "df_resumo"):
+                                st.session_state.pop(k, None)
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Falha ao abrir: {e}")
