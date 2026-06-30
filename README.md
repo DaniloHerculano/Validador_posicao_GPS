@@ -101,3 +101,7 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
 - Histórico reformulado para **leitura de pasta pública do Google Drive** (somente leitura, via API Key — sem conta de serviço, sem cota, sem custo).
 - Modelo: cada subpasta da pasta de histórico = um teste (com CSV/XLS/KML). A equipe seleciona e o app baixa e roda a análise.
 - Removida a dependência google-auth (não é mais necessária para API Key).
+
+## v0.9.1
+- Correção: o seletor de **Histórico** agora aparece logo no topo (seção Importar Arquivos), antes de carregar qualquer arquivo — permitindo abrir um teste salvo sem precisar enviar nada primeiro.
+- Aba Histórico simplificada (aponta para o seletor do topo), evitando widgets duplicados.
