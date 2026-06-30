@@ -187,6 +187,7 @@ Repita o padrão para cada rastreador (mesmo nome-base, extensões `.csv`, `.xls
 | **Movimento** | Velocidade, direção, sensor | CSV + XLS |
 | **Bateria** | Nível e consumo | XLS ou CSV |
 | **Latência** | Tempo módulo→servidor, buffer | CSV (técnico) |
+| **Histórico** | Abrir testes salvos no Google Drive | — |
 """)
 
     # ── Como o erro é medido ──
@@ -202,7 +203,24 @@ essa distância em km.
 > coluna `dif_seg` nos dados sincronizados mostra essa defasagem de tempo.
 """)
 
-    st.caption("Stoneridge Brasil · Validador de Posicionamento")
+    # ── Histórico ──
+    st.markdown("#### 💾 Histórico de testes (Google Drive)")
+    st.markdown("""
+Para evitar que cada pessoa precise enviar os arquivos de novo, é possível **abrir um
+teste já salvo** numa pasta do Google Drive. O seletor fica no topo da página, na
+seção *Importar Arquivos* → **"Abrir um teste salvo no histórico"**.
+
+Como está organizado: dentro da pasta de histórico, **cada subpasta é um teste** (com
+seus arquivos CSV / XLS / KML). Para abrir, basta selecionar o teste na lista e clicar
+em **Abrir** — o app baixa os arquivos e roda a análise automaticamente.
+
+Para **adicionar** um novo teste ao histórico, crie uma subpasta no Drive (ex.:
+*Cliente X_Rota SP-BH_10.06-15.06*) e coloque nela os arquivos daquele teste. Na
+próxima vez que abrir o seletor (ou clicar em *Atualizar*), o novo teste aparece para
+toda a equipe.
+""")
+
+    st.caption("Stoneridge Brasil · Teste de Rodagem")
 
 
 HELP_CSS = """
