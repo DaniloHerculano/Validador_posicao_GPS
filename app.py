@@ -46,7 +46,7 @@ with st.sidebar:
     raio3 = st.number_input("Raio 3 (km)", value=5.0, step=0.5, min_value=0.1)
     st.markdown("---")
     botao_sair()
-    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.8</span>',
+    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.9</span>',
                 unsafe_allow_html=True)
 
 # ── AJUDA RÁPIDA ──────────────────────────────────────────────────────────────
@@ -248,65 +248,56 @@ with abas[9]:
 # ── ABA HISTÓRICO ─────────────────────────────────────────────────────────────
 with abas[10]:
     sec("Histórico de Relatórios")
+    st.caption("Abra um teste já salvo na pasta do Google Drive, sem precisar enviar os "
+               "arquivos novamente. Cada subpasta da pasta de histórico é um teste.")
     if not hist.disponivel():
         st.info(
-            "📂 O histórico permite **salvar** os arquivos de uma análise no Google Drive "
-            "e **reabrir** depois, sem precisar enviá-los de novo"
-            "com a equipe.\n\n"
-            "**PEGADINHA DO MALLANDRO... glu glu yeah yeah!** Função não disponível no momento!")
-          
+            "📂 O histórico lê os testes de uma **pasta pública do Google Drive**.\n\n"
+            "Como funciona: você organiza, no Drive, uma **subpasta por teste** (ex.: "
+            "*Teste Rota SP BH*) contendo os arquivos CSV / XLS / KML daquele teste. "
+            "A equipe então seleciona o teste aqui e o app baixa os arquivos e roda a "
+            "análise automaticamente.\n\n"
+            "Para ativar, configure em *Settings → Secrets* no Streamlit Cloud:\n"
+            "```toml\n[gdrive]\napi_key = \"SUA_API_KEY\"\nfolder_id = \"ID_DA_PASTA\"\n```\n"
+            "A pasta e suas subpastas devem estar com acesso **\"qualquer pessoa com o link\"**. "
+            "Enquanto não estiver configurado, o restante do app funciona normalmente.")
     else:
-        # Salvar a análise atual
-        st.markdown("**💾 Salvar esta análise no histórico**")
-        cS1, cS2 = st.columns(2)
-        with cS1:
-            projeto = st.text_input("Projeto", placeholder="Ex.: Homologação RI720 2026")
-        with cS2:
-            rota = st.text_input("Rota", placeholder="Ex.: Campinas → Sumaré")
-        if st.button("💾  Salvar no histórico"):
-            ab = st.session_state.get("arquivos_bytes_atuais") or {}
-            if not ab:
-                st.warning("Nenhum arquivo carregado para salvar.")
-            elif not (projeto.strip() or rota.strip()):
-                st.warning("Informe ao menos o nome do projeto ou da rota.")
-            else:
-                try:
-                    with st.spinner("Enviando arquivos ao Google Drive..."):
-                        hist.salvar(projeto, rota, ab)
-                    st.success("Análise salva no histórico com sucesso.")
-                except Exception as e:
-                    st.error(f"Falha ao salvar: {e}")
-
-        st.markdown("---")
-        st.markdown("**📁 Abrir uma análise salva**")
-        busca = st.text_input("Pesquisar por projeto ou rota", key="busca_hist")
-        if st.button("🔄  Atualizar lista") or "hist_lista" not in st.session_state:
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            busca = st.text_input("Pesquisar teste por nome", key="busca_hist",
+                                  placeholder="Ex.: SP BH")
+        with c2:
+            st.write("")
+            atualizar = st.button("🔄  Atualizar lista", use_container_width=True)
+        if atualizar or "hist_lista" not in st.session_state:
             try:
-                st.session_state["hist_lista"] = hist.listar()
+                with st.spinner("Lendo pasta do Drive..."):
+                    st.session_state["hist_lista"] = hist.listar()
             except Exception as e:
-                st.error(f"Falha ao listar: {e}")
+                st.error(f"Falha ao listar a pasta do Drive: {e}")
                 st.session_state["hist_lista"] = []
         itens = st.session_state.get("hist_lista", [])
         if busca.strip():
             b = busca.lower()
-            itens = [it for it in itens
-                     if b in it["projeto"].lower() or b in it["rota_pasta"].lower()]
+            itens = [it for it in itens if b in it["nome"].lower()]
         if not itens:
-            st.caption("Nenhuma análise salva encontrada.")
+            st.caption("Nenhum teste encontrado na pasta do histórico.")
         for it in itens:
             cI1, cI2 = st.columns([4, 1])
             with cI1:
-                st.markdown(f"**{it['projeto']}** · {it['rota_pasta']}")
+                st.markdown(f"📁 **{it['nome']}**")
             with cI2:
-                if st.button("Abrir", key=f"open_{it['pasta_id']}"):
+                if st.button("Abrir", key=f"open_{it['pasta_id']}", use_container_width=True):
                     try:
-                        with st.spinner("Baixando arquivos do Drive..."):
+                        with st.spinner(f"Baixando '{it['nome']}' do Drive..."):
                             arqs = hist.baixar_arquivos(it["pasta_id"])
-                        st.session_state["hist_arquivos"] = arqs
-                        st.session_state["hist_label"] = f"{it['projeto']} · {it['rota_pasta']}"
-                        # Limpa resultados antigos para reprocessar com os novos arquivos
-                        for k in ("resultados", "ref_df", "comparacao", "df_resumo"):
-                            st.session_state.pop(k, None)
-                        st.rerun()
+                        if not arqs:
+                            st.warning("Esta subpasta não contém arquivos.")
+                        else:
+                            st.session_state["hist_arquivos"] = arqs
+                            st.session_state["hist_label"] = it["nome"]
+                            for k in ("resultados", "ref_df", "comparacao", "df_resumo"):
+                                st.session_state.pop(k, None)
+                            st.rerun()
                     except Exception as e:
                         st.error(f"Falha ao abrir: {e}")
