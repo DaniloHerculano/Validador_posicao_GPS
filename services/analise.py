@@ -1,86 +1,95 @@
 """
-analise.py — Sincronização por horário entre referência e comparados,
-e cálculo de métricas de precisão.
+auth.py — Tela de login simples (credenciais fixas) para restringir o acesso.
+Padrão visual Stoneridge: logo, vermelho, layout centralizado.
 """
-import pandas as pd
-from services.loader import calcular_distancia
+import base64
+from pathlib import Path
+import streamlit as st
+
+# Credenciais fixas (provisórias)
+_USUARIO = "validapst"
+_SENHA = "123456"
+
+# Versão corrente do sistema (exibida na tela de login)
+VERSAO = "0.9"
 
 
-def sincronizar(df_ref: pd.DataFrame, df_comp: pd.DataFrame, tol_min: int) -> pd.DataFrame:
+def _logo_b64() -> str:
+    caminho = Path(__file__).parent.parent / "assets" / "stoneridge_logo.png"
+    if caminho.exists():
+        return base64.b64encode(caminho.read_bytes()).decode()
+    return ""
+
+
+_LOGIN_CSS = """
+<style>
+/* Esconde sidebar e cabeçalho do Streamlit na tela de login */
+section[data-testid="stSidebar"], header[data-testid="stHeader"] { display: none !important; }
+.block-container { padding-top: 3.5rem !important; max-width: 460px !important; }
+
+.login-card{
+  background:#ffffff;border:1px solid #dce4ee;border-radius:16px;
+  padding:2.4rem 2.2rem;box-shadow:0 18px 50px rgba(44,57,70,.18);
+  margin:0 auto;}
+.login-logo{text-align:center;margin-bottom:1.4rem;}
+.login-logo img{max-height:54px;}
+.login-title{font-family:'Barlow Condensed',sans-serif;font-size:1.7rem;font-weight:800;
+  color:#2c3946;text-align:center;line-height:1.1;}
+.login-sub{font-size:.82rem;color:#6b7f8f;text-align:center;margin-top:.2rem;margin-bottom:1.6rem;}
+.login-strip{height:4px;background:linear-gradient(90deg,#2c3946,#dd0933);
+  border-radius:3px;margin-bottom:1.6rem;}
+.login-sec{text-align:center;font-size:.72rem;color:#6b7f8f;margin-top:1.3rem;}
+</style>
+"""
+
+
+def _render_form() -> bool:
+    """Desenha o formulário e retorna True se autenticou agora."""
+    st.markdown(_LOGIN_CSS, unsafe_allow_html=True)
+
+    b64 = _logo_b64()
+    logo_html = (f'<div class="login-logo"><img src="data:image/png;base64,{b64}"/></div>'
+                 if b64 else "")
+    st.markdown(
+        f'<div class="login-card">{logo_html}'
+        f'<div class="login-title">Pósitron Rastreamento</div>'
+        f'<div class="login-sub">Testes de Rodagem · Validação e Análise · Stoneridge Brasil</div>'
+        f'<div class="login-strip"></div></div>',
+        unsafe_allow_html=True)
+
+    with st.form("login_form", clear_on_submit=False):
+        usuario = st.text_input("Usuário", placeholder="Digite seu usuário")
+        senha = st.text_input("Senha", type="password", placeholder="Digite sua senha")
+        entrar = st.form_submit_button("🔒  Entrar")
+
+    if entrar:
+        if usuario.strip() == _USUARIO and senha == _SENHA:
+            st.session_state["autenticado"] = True
+            return True
+        else:
+            st.error("Credenciais inválidas. Verifique usuário e senha.")
+
+    st.markdown(f'<div class="login-sec">🔐 Acesso restrito — uso interno Stoneridge'
+                f'<br><br>Versão {VERSAO}</div>',
+                unsafe_allow_html=True)
+    return False
+
+
+def exigir_login():
     """
-    Para cada registro do comparado, encontra o ponto mais próximo no tempo
-    na referência (dentro da tolerância) e calcula a distância geodésica.
-    Usa lat/lon já consolidadas (XLS > CSV). Inclui endereço/estimada quando houver.
+    Gate de autenticação. Se não estiver logado, mostra a tela de login e
+    interrompe o restante do app. Chame logo no início do app.py.
     """
-    resultados = []
-    tol = pd.Timedelta(minutes=tol_min)
-    ref = df_ref.dropna(subset=["datetime_module", "latitude", "longitude"])
-    ref_times = ref["datetime_module"]
-    if ref_times.empty:
-        return pd.DataFrame()
-
-    for _, row in df_comp.iterrows():
-        t = row.get("datetime_module")
-        if pd.isna(t) or pd.isna(row.get("latitude")) or pd.isna(row.get("longitude")):
-            continue
-        diffs = (ref_times - t).abs()
-        if diffs.empty:
-            continue
-        idx = diffs.idxmin()
-        if diffs.loc[idx] > tol:
-            continue
-        r = ref.loc[idx]
-        dist = calcular_distancia(r["latitude"], r["longitude"],
-                                  row["latitude"], row["longitude"])
-        raio = row.get("raio_km", None)
-        dentro_raio = None
-        if raio is not None and pd.notna(raio) and dist is not None:
-            dentro_raio = bool(dist <= raio)
-        resultados.append({
-            "horario_ref": r["datetime_module"], "horario_comp": t,
-            "dif_seg": abs((r["datetime_module"] - t).total_seconds()),
-            "lat_ref": r["latitude"], "lon_ref": r["longitude"],
-            "lat_comp": row["latitude"], "lon_comp": row["longitude"],
-            "distancia_km": dist,
-            "raio_km": raio if (raio is not None and pd.notna(raio)) else None,
-            "dentro_raio": dentro_raio,
-            "endereco_comp": row.get("endereco", None),
-            "estimada_comp": row.get("_estimada_bool", None),
-            "gps_valido_comp": row.get("_gps_bool", None),
-            "_tech_comp": row.get("_tech", "N/A"),
-            "_operadora_comp": row.get("_operadora", "N/A"),
-        })
-    return pd.DataFrame(resultados)
+    if st.session_state.get("autenticado"):
+        return
+    autenticou = _render_form()
+    if autenticou:
+        st.rerun()
+    st.stop()
 
 
-def resumo_raio(df: pd.DataFrame) -> dict:
-    """Métricas de validação contra o raio do sistema (KML)."""
-    if len(df) == 0 or "dentro_raio" not in df.columns:
-        return None
-    val = df.dropna(subset=["dentro_raio", "distancia_km", "raio_km"])
-    if len(val) == 0:
-        return None
-    return {
-        "pontos": len(val),
-        "dentro": int(val["dentro_raio"].sum()),
-        "pct_dentro": round(val["dentro_raio"].mean() * 100, 1),
-        "raio_medio": round(val["raio_km"].mean(), 3),
-        "raio_min": round(val["raio_km"].min(), 3),
-        "raio_max": round(val["raio_km"].max(), 3),
-    }
-
-
-def gerar_resumo(df: pd.DataFrame, raio1: float, raio2: float, raio3: float) -> dict:
-    if len(df) == 0 or "distancia_km" not in df.columns:
-        return None
-    d = df["distancia_km"].dropna()
-    if len(d) == 0:
-        return None
-    return {
-        "sincronizacoes": len(d),
-        "erro_medio": round(d.mean(), 3), "erro_max": round(d.max(), 3),
-        "erro_min": round(d.min(), 3), "mediana": round(d.median(), 3),
-        "pct_r1": round((d <= raio1).mean() * 100, 1),
-        "pct_r2": round((d <= raio2).mean() * 100, 1),
-        "pct_r3": round((d <= raio3).mean() * 100, 1),
-    }
+def botao_sair():
+    """Botão de logout para colocar na sidebar."""
+    if st.button("🚪  Sair", key="logout", use_container_width=True):
+        st.session_state["autenticado"] = False
+        st.rerun()
