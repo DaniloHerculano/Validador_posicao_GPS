@@ -96,3 +96,8 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
 ## v0.8
 - Rede: análise de **frequência/banda do modem** (GSM850/900/1800/1900, LTE B3/B5/B7/B28...), com % por banda — útil para avaliar desempenho do modem em 2G e 4G.
 - **Histórico de relatórios** via Google Drive: salvar os arquivos originais (CSV/XLS/KML) sob Projeto/Rota e reabrir depois (qualquer usuário logado). Requer configurar credenciais de conta de serviço do Google em st.secrets; sem isso, a aba exibe instruções e o restante do app funciona normalmente.
+
+## v0.9
+- Histórico reformulado para **leitura de pasta pública do Google Drive** (somente leitura, via API Key — sem conta de serviço, sem cota, sem custo).
+- Modelo: cada subpasta da pasta de histórico = um teste (com CSV/XLS/KML). A equipe seleciona e o app baixa e roda a análise.
+- Removida a dependência google-auth (não é mais necessária para API Key).
