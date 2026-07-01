@@ -36,6 +36,8 @@ def badge(tipo: str) -> str:
         return '<span class="badge badge-gps">GPS Real</span>'
     if tipo == "Posição Estimada":
         return '<span class="badge badge-est">Pos. Estimada</span>'
+    if tipo and tipo.startswith("Misto"):
+        return '<span class="badge badge-misto">Misto (Real+Est.)</span>'
     return '<span class="badge badge-unk">Desconhecido</span>'
 
 
@@ -112,6 +114,7 @@ h1,h2,h3,h4{font-family:'Barlow Condensed',sans-serif!important;font-weight:700!
 .badge-gps{background:#e4f5ec;color:#1f8b4c;border:1px solid #b5e3c8;}
 .badge-est{background:#fdeede;color:#c2691a;border:1px solid #f5cfa0;}
 .badge-unk{background:#eceef5;color:#5b6bb0;border:1px solid #c9cfe8;}
+.badge-misto{background:#eaf2fb;color:#2477b3;border:1px solid #b8d5ee;}
 
 /* Métricas */
 .metric-grid{display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:1rem;}
