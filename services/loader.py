@@ -263,8 +263,16 @@ def consolidar_equipamento(nome, csv_file, xls_file, kml_file=None, tol_fusao=60
         if "_bateria_pct" not in df.columns or df["_bateria_pct"].isna().all():
             if "_bateria_pct_csv" in df.columns:
                 df["_bateria_pct"] = df["_bateria_pct_csv"]
-        tipo = ("Posição Estimada" if df.get("_estimada_bool", pd.Series([False])).mean() > 0.5
-                else "GPS Real") if "_estimada_bool" in df.columns else "Desconhecido"
+        if "_estimada_bool" in df.columns and df["_estimada_bool"].notna().any():
+            frac_est = df["_estimada_bool"].mean()
+            if 0.05 < frac_est < 0.95:
+                tipo = "Misto (Real + Estimada)"
+            elif frac_est >= 0.95:
+                tipo = "Posição Estimada"
+            else:
+                tipo = "GPS Real"
+        else:
+            tipo = "Desconhecido"
     elif df_csv is not None:
         df = df_csv.copy()
         if "_bateria_pct_csv" in df.columns:
