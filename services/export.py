@@ -54,12 +54,39 @@ def gerar_excel(df_resumo, resultados: dict, dados: list,
       - Uma aba por equipamento sincronizado (tabela + linha de erro no tempo)
     """
     from openpyxl import Workbook
+    import datetime as _dt
     wb = Workbook()
     raio1, raio2, raio3 = raios
 
+    # ── Aba CAPA / INFORMAÇÕES ──
+    wscapa = wb.active
+    wscapa.title = "Informações"
+    wscapa["A1"] = "TESTE DE RODAGEM — Relatório de Análise"
+    wscapa["A1"].font = Font(bold=True, size=16, color=C_SLATE)
+    wscapa["A2"] = "Análise comparativa GPS Real × Posição Estimada · Stoneridge Brasil"
+    wscapa["A2"].font = Font(size=11, color=C_RED, bold=True)
+    wscapa["A4"] = "Gerado em:"
+    wscapa["B4"] = _dt.datetime.now().strftime("%d/%m/%Y %H:%M")
+    wscapa["A4"].font = Font(bold=True)
+    wscapa["A6"] = "Equipamentos analisados"
+    wscapa["A6"].font = Font(bold=True, size=12, color=C_SLATE)
+    # Tabela de equipamentos
+    hdr_row = 7
+    for j, h in enumerate(["Modelo", "PIN", "Arquivo", "Tipo", "Fonte", "Registros"], 1):
+        c = wscapa.cell(row=hdr_row, column=j, value=h)
+        c.fill = PatternFill("solid", fgColor=C_SLATE)
+        c.font = Font(color="FFFFFF", bold=True)
+    for i, d in enumerate(dados, 1):
+        r = hdr_row + i
+        vals = [d.get("modelo", "—"), d.get("pin", "—"), d.get("arquivo", "—"),
+                d.get("tipo", "—"), d.get("fonte", "—"), d.get("registros", 0)]
+        for j, v in enumerate(vals, 1):
+            wscapa.cell(row=r, column=j, value=v)
+    for col, w in zip("ABCDEF", [12, 14, 40, 20, 14, 10]):
+        wscapa.column_dimensions[col].width = w
+
     # ── Aba RESUMO ──
-    ws = wb.active
-    ws.title = "Resumo"
+    ws = wb.create_sheet("Resumo")
     if df_resumo is not None and len(df_resumo) > 0:
         _escreve_df(ws, df_resumo)
         n = len(df_resumo)
@@ -138,22 +165,41 @@ def gerar_excel(df_resumo, resultados: dict, dados: list,
             continue
         ws3 = wb.create_sheet(f"Sync_{_nome_aba(nome)}"[:31])
         cols = [c for c in ["horario_comp", "distancia_km", "raio_km", "dentro_raio",
-                            "lat_comp", "lon_comp", "_tech_comp", "_operadora_comp",
+                            "estimada_comp", "gps_valido_comp", "lat_comp", "lon_comp",
+                            "_tech_comp", "_operadora_comp", "_banda_comp",
                             "endereco_comp"] if c in df.columns]
         dfx = df[cols].copy()
+        # Traduzir flags booleanas para texto legível
+        if "estimada_comp" in dfx.columns:
+            dfx["estimada_comp"] = dfx["estimada_comp"].map(
+                {True: "Estimada", False: "GPS Real"}).fillna("—")
+        if "gps_valido_comp" in dfx.columns:
+            dfx["gps_valido_comp"] = dfx["gps_valido_comp"].map(
+                {True: "Válido", False: "Inválido"}).fillna("—")
+        if "dentro_raio" in dfx.columns:
+            dfx["dentro_raio"] = dfx["dentro_raio"].map(
+                {True: "Dentro", False: "Fora"}).fillna("—")
+        # Cabeçalhos amigáveis
+        ren = {"horario_comp": "Horário", "distancia_km": "Erro (km)",
+               "raio_km": "Raio Sistema (km)", "dentro_raio": "No Raio?",
+               "estimada_comp": "Tipo Posição", "gps_valido_comp": "GPS Válido?",
+               "lat_comp": "Latitude", "lon_comp": "Longitude",
+               "_tech_comp": "Tecnologia", "_operadora_comp": "Operadora",
+               "_banda_comp": "Banda", "endereco_comp": "Endereço Estimado"}
+        dfx = dfx.rename(columns=ren)
         for c in dfx.columns:
             if "horario" in c:
                 dfx[c] = dfx[c].astype(str)
         _escreve_df(ws3, dfx)
         n = len(dfx)
-        if "distancia_km" in dfx.columns:
-            cdist = list(dfx.columns).index("distancia_km") + 1
+        if "Erro (km)" in dfx.columns:
+            cdist = list(dfx.columns).index("Erro (km)") + 1
             line = LineChart(); line.title = "Erro de Posição ao Longo do Tempo (km)"
             line.style = 12
             data = Reference(ws3, min_col=cdist, min_row=1, max_row=n + 1)
             line.add_data(data, titles_from_data=True)
             line.height = 8; line.width = 20
-            ws3.add_chart(line, f"{chr(65 + len(cols) + 1)}2")
+            ws3.add_chart(line, f"{chr(65 + len(dfx.columns) + 1)}2")
 
     buf = io.BytesIO()
     wb.save(buf)
