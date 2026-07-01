@@ -49,6 +49,7 @@ def sincronizar(df_ref: pd.DataFrame, df_comp: pd.DataFrame, tol_min: int) -> pd
             "gps_valido_comp": row.get("_gps_bool", None),
             "_tech_comp": row.get("_tech", "N/A"),
             "_operadora_comp": row.get("_operadora", "N/A"),
+            "_banda_comp": row.get("_banda", "—"),
         })
     return pd.DataFrame(resultados)
 
