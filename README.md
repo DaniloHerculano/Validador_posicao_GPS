@@ -105,3 +105,11 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
 ## v0.9.1
 - Correção: o seletor de **Histórico** agora aparece logo no topo (seção Importar Arquivos), antes de carregar qualquer arquivo — permitindo abrir um teste salvo sem precisar enviar nada primeiro.
 - Aba Histórico simplificada (aponta para o seletor do topo), evitando widgets duplicados.
+
+## v0.9.2
+- "Como Usar" atualizado com a seção **Histórico** (como abrir testes salvos no Drive e como adicionar novos) e a linha correspondente na tabela de abas.
+
+## v0.10
+- Suporte a rastreadores **mistos** (que ativaram o GPS durante a viagem, tendo pontos estimados E GPS real no mesmo arquivo): novo tipo "Misto", com métricas de erro separadas por tipo na aba Precisão e distinção visual no Mapa (GPS Real em verde × Estimada na cor do equipamento).
+- Buffer/latência confirmado funcionando (Data Servidor − Data Módulo).
+- Export (Excel) melhorado: nova aba **Informações** (capa com metadados e equipamentos), colunas nas abas de sincronização traduzidas e ampliadas (Tipo Posição, GPS Válido?, Banda, No Raio?, Endereço), cabeçalhos legíveis.
