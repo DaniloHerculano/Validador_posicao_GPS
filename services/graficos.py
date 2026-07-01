@@ -141,6 +141,19 @@ def aba_mapa(resultados, df_ref, ref_nome):
             "Destacar em vermelho as amostras que ficaram fora do raio do sistema",
             value=False, key="destaca_fora")
 
+    # Distinguir pontos GPS Real × Estimada (útil p/ equipamentos mistos)
+    tem_misto = any(
+        len(dfs) > 0 and "estimada_comp" in dfs.columns
+        and dfs["estimada_comp"].notna().any()
+        and dfs["estimada_comp"].nunique(dropna=True) > 1
+        for dfs in resultados.values())
+    distinguir_tipo = False
+    if tem_misto:
+        distinguir_tipo = st.checkbox(
+            "Distinguir no mapa os pontos GPS Real × Posição Estimada "
+            "(há equipamento que ativou o GPS durante a viagem)",
+            value=True, key="distingue_tipo")
+
     fig = go.Figure()
 
     # Referência
@@ -172,7 +185,36 @@ def aba_mapa(resultados, df_ref, ref_nome):
         customdata = list(zip(erro_txt, list(dt_txt)))
 
         tem_raio_eq = "raio_km" in dfv.columns and dfv["raio_km"].notna().any()
-        if destacar_fora and tem_raio_eq and "dentro_raio" in dfv.columns:
+        eh_misto_eq = ("estimada_comp" in dfv.columns
+                       and dfv["estimada_comp"].notna().any()
+                       and dfv["estimada_comp"].nunique(dropna=True) > 1)
+
+        if distinguir_tipo and eh_misto_eq:
+            est_mask = dfv["estimada_comp"].astype("boolean").fillna(False).values
+            cd = list(customdata)
+            # Pontos com POSIÇÃO ESTIMADA (cor do equipamento, formato escolhido)
+            dest = dfv[est_mask]
+            if len(dest) > 0:
+                cd_e = [cd[k] for k in range(len(dfv)) if bool(est_mask[k])]
+                fig.add_trace(go.Scattermap(
+                    lat=dest["lat_comp"], lon=dest["lon_comp"], mode="markers",
+                    marker=dict(size=11, color=cor, symbol=formato),
+                    name=f"{nome} · estimada", customdata=cd_e,
+                    hovertemplate="<b>" + nome + "</b> · Posição Estimada<br>"
+                                  "Erro: %{customdata[0]}<br>%{lat:.5f}, %{lon:.5f}<br>"
+                                  "%{customdata[1]}<extra></extra>"))
+            # Pontos com GPS REAL (mesmo equipamento, marcador verde contornado)
+            dreal = dfv[~est_mask]
+            if len(dreal) > 0:
+                cd_r = [cd[k] for k in range(len(dfv)) if not bool(est_mask[k])]
+                fig.add_trace(go.Scattermap(
+                    lat=dreal["lat_comp"], lon=dreal["lon_comp"], mode="markers",
+                    marker=dict(size=10, color="#1f8b4c", symbol="circle"),
+                    name=f"{nome} · GPS real", customdata=cd_r,
+                    hovertemplate="<b>" + nome + "</b> · GPS Real<br>"
+                                  "Erro: %{customdata[0]}<br>%{lat:.5f}, %{lon:.5f}<br>"
+                                  "%{customdata[1]}<extra></extra>"))
+        elif destacar_fora and tem_raio_eq and "dentro_raio" in dfv.columns:
             base_idx = dfv.index
             dentro_mask = dfv["dentro_raio"].astype("boolean").fillna(True)
             cd = list(customdata)
@@ -287,6 +329,23 @@ def aba_precisao(resultados, raios):
                 tile(f"≤{raio2:.1f}km", f"{p2:.1f}%", cc="amber"),
                 tile(f"≤{raio3:.1f}km", f"{p3:.1f}%"),
             )
+            # Quebra por tipo de ponto (GPS Real × Estimada) — para equipamentos mistos
+            if ("estimada_comp" in df.columns and df["estimada_comp"].notna().any()
+                    and df["estimada_comp"].nunique(dropna=True) > 1):
+                dfd = df.dropna(subset=["distancia_km"]).copy()
+                dfd["estimada_comp"] = dfd["estimada_comp"].astype("boolean")
+                d_est = dfd[dfd["estimada_comp"] == True]["distancia_km"]
+                d_real = dfd[dfd["estimada_comp"] == False]["distancia_km"]
+                st.markdown("**Este equipamento tem os dois modos** (ativou o GPS durante a "
+                            "viagem). Erro separado por tipo de posição:")
+                grid(
+                    tile("Pontos GPS Real", f"{len(d_real):,}", cc="green"),
+                    tile("Erro médio (GPS Real)",
+                         f"{d_real.mean():.3f} km" if len(d_real) else "—", cc="green"),
+                    tile("Pontos Estimados", f"{len(d_est):,}", cc="amber"),
+                    tile("Erro médio (Estimada)",
+                         f"{d_est.mean():.3f} km" if len(d_est) else "—", cc="amber"),
+                )
             cL, cR = st.columns(2)
             with cL:
                 fig = px.histogram(df, x="distancia_km", nbins=40,
