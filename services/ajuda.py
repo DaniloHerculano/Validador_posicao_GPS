@@ -173,6 +173,19 @@ Repita o padrão para cada rastreador (mesmo nome-base, extensões `.csv`, `.xls
 7. Na aba **Dados & Export**, baixe o Excel com tabelas e gráficos.
 """)
 
+    # ── Modos de análise ──
+    st.markdown("#### 🔀 Dois modos de análise")
+    st.markdown("""
+Ao carregar os arquivos, escolha o modo:
+
+- **Comparativo** — compara um rastreador de **referência** (GPS ligado) contra as
+  amostras estimadas, medindo a precisão da posição. É o modo para validar posicionamento.
+- **Individual** — inspeciona **cada peça isoladamente** (consumo de bateria, rede e
+  operadora, banda, qualidade de GPS, movimento, latência), **sem** precisar de
+  referência nem comparação. Útil quando você quer só analisar uma peça — por exemplo,
+  ver a bateria ou a rede que ela usou.
+""")
+
     # ── O que cada aba mostra ──
     st.markdown("#### 📊 O que cada aba mostra")
     st.markdown("""
