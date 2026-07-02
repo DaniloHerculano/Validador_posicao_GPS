@@ -113,3 +113,12 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
 - Suporte a rastreadores **mistos** (que ativaram o GPS durante a viagem, tendo pontos estimados E GPS real no mesmo arquivo): novo tipo "Misto", com métricas de erro separadas por tipo na aba Precisão e distinção visual no Mapa (GPS Real em verde × Estimada na cor do equipamento).
 - Buffer/latência confirmado funcionando (Data Servidor − Data Módulo).
 - Export (Excel) melhorado: nova aba **Informações** (capa com metadados e equipamentos), colunas nas abas de sincronização traduzidas e ampliadas (Tipo Posição, GPS Válido?, Banda, No Raio?, Endereço), cabeçalhos legíveis.
+
+## v0.11
+- Novo **modo Individual**: permite subir os arquivos de uma peça (ou várias) e inspecioná-las isoladamente — consumo de bateria, rede/operadora, banda, qualidade de GPS, movimento e latência — sem precisar de referência nem comparação de posição. Escolhido via seletor ao carregar os arquivos.
+- Modo Comparativo (referência × amostras) permanece como estava.
+- "Como Usar" atualizado com a explicação dos dois modos.
+
+## v0.10.1
+- Modo **Individual** confirmado e testado (inspecionar uma ou várias peças isoladamente — bateria, rede, banda, GPS, movimento, latência — sem exigir comparação).
+- Correção técnica: substituído o parâmetro `use_container_width` (que o Streamlit removerá após 2025) por `width='stretch'`, evitando quebra futura. Versão mínima do Streamlit ajustada para 1.49.
