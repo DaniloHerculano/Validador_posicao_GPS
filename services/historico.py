@@ -113,7 +113,7 @@ def painel_historico(st_mod, expandido=False):
         with c2:
             st.write("")
             atualizar = st.button("🔄  Atualizar", key="btn_upd_hist",
-                                  use_container_width=True)
+                                  width='stretch')
         if atualizar or "hist_lista" not in st.session_state:
             try:
                 with st.spinner("Lendo pasta do Drive..."):
@@ -133,7 +133,7 @@ def painel_historico(st_mod, expandido=False):
                 st.markdown(f"📁 **{it['nome']}**")
             with cI2:
                 if st.button("Abrir", key=f"open_{it['pasta_id']}",
-                             use_container_width=True):
+                             width='stretch'):
                     try:
                         with st.spinner(f"Baixando '{it['nome']}'..."):
                             arqs = baixar_arquivos(it["pasta_id"])
