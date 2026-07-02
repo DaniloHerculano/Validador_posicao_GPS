@@ -46,7 +46,7 @@ def aba_visao_geral(resultados, df_ref, ref_nome, raios):
 
     df_resumo = pd.DataFrame(linhas) if linhas else None
     if df_resumo is not None:
-        st.dataframe(df_resumo, use_container_width=True, hide_index=True)
+        st.dataframe(df_resumo, width='stretch', hide_index=True)
         st.session_state["df_resumo"] = df_resumo
 
         c1, c2 = st.columns(2)
@@ -59,7 +59,7 @@ def aba_visao_geral(resultados, df_ref, ref_nome, raios):
                     y=[r[f"% ≤{raio1:.1f}km"], r[f"% ≤{raio2:.1f}km"], r[f"% ≤{raio3:.1f}km"]],
                     marker_color=PALETA[i % len(PALETA)]))
             fig.update_layout(title="% Dentro de Cada Raio", barmode="group")
-            st.plotly_chart(aplica_tema(fig, 340), use_container_width=True, key="vg_raios")
+            st.plotly_chart(aplica_tema(fig, 340), width='stretch', key="vg_raios")
         with c2:
             fig = go.Figure(go.Bar(
                 x=[r["Equipamento"] for r in linhas],
@@ -67,7 +67,7 @@ def aba_visao_geral(resultados, df_ref, ref_nome, raios):
                 marker_color=[PALETA[i % len(PALETA)] for i in range(len(linhas))],
                 text=[f"{r['Erro Médio (km)']:.2f}" for r in linhas], textposition="outside"))
             fig.update_layout(title="Erro Médio por Equipamento (km)", showlegend=False)
-            st.plotly_chart(aplica_tema(fig, 340), use_container_width=True, key="vg_erro")
+            st.plotly_chart(aplica_tema(fig, 340), width='stretch', key="vg_erro")
 
     sec(f"Referência — {ref_nome}")
     gps_ok = int(df_ref["_gps_bool"].sum()) if "_gps_bool" in df_ref.columns else 0
@@ -282,7 +282,7 @@ def aba_mapa(resultados, df_ref, ref_nome):
                     bgcolor="rgba(255,255,255,.9)", bordercolor="#dce4ee", borderwidth=1,
                     font=dict(color="#1f2a36", size=11)),
         font=dict(family="Barlow, sans-serif", color="#1f2a36"))
-    st.plotly_chart(fig, use_container_width=True, key="mapa_principal",
+    st.plotly_chart(fig, width='stretch', key="mapa_principal",
                     config={"modeBarButtonsToRemove": ["lasso2d", "select2d"]})
 
     pts = []
@@ -300,7 +300,7 @@ def aba_mapa(resultados, df_ref, ref_nome):
             color_continuous_scale=["#1f8b4c", "#e08a1e", "#dd0933"])
         figh.update_layout(margin=dict(l=0, r=0, t=0, b=0), height=480,
             paper_bgcolor="#ffffff", font=dict(family="Barlow, sans-serif", color="#1f2a36"))
-        st.plotly_chart(figh, use_container_width=True, key="mapa_calor")
+        st.plotly_chart(figh, width='stretch', key="mapa_calor")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -355,7 +355,7 @@ def aba_precisao(resultados, raios):
                                        (raio3, "#d92020", f"{raio3}km")]:
                     fig.add_vline(x=raio, line_dash="dash", line_color=cor, line_width=1.5,
                         annotation_text=lbl, annotation_font_color=cor, annotation_position="top right")
-                st.plotly_chart(aplica_tema(fig), use_container_width=True, key=f"hist_{ci}")
+                st.plotly_chart(aplica_tema(fig), width='stretch', key=f"hist_{ci}")
             with cR:
                 d1 = (d <= raio1).sum(); d2 = ((d > raio1) & (d <= raio2)).sum()
                 d3 = ((d > raio2) & (d <= raio3)).sum(); d4 = (d > raio3).sum()
@@ -363,22 +363,22 @@ def aba_precisao(resultados, raios):
                     labels=[f"≤{raio1}km", f"{raio1}–{raio2}km", f"{raio2}–{raio3}km", f">{raio3}km"],
                     values=[d1, d2, d3, d4], hole=0.55, marker=dict(colors=COLORS_RAIOS)))
                 fig.update_layout(title="Distribuição por Raio")
-                st.plotly_chart(aplica_tema(fig), use_container_width=True, key=f"pie_raio_{ci}")
+                st.plotly_chart(aplica_tema(fig), width='stretch', key=f"pie_raio_{ci}")
             if "horario_comp" in df.columns:
                 dfs = df.sort_values("horario_comp")
                 fig = px.line(dfs, x="horario_comp", y="distancia_km",
                     title="Erro ao Longo do Tempo", color_discrete_sequence=[SR_SLATE], markers=True)
                 fig.add_hrect(y0=0, y1=raio2, fillcolor="#1f8b4c", opacity=0.07, line_width=0)
-                st.plotly_chart(aplica_tema(fig, 260), use_container_width=True, key=f"line_{ci}")
+                st.plotly_chart(aplica_tema(fig, 260), width='stretch', key=f"line_{ci}")
             if "endereco_comp" in df.columns and df["endereco_comp"].notna().any():
                 piores = df.dropna(subset=["distancia_km"]).nlargest(5, "distancia_km")
                 if len(piores) > 0 and piores["endereco_comp"].notna().any():
                     st.markdown("**📍 Pontos de maior erro (endereço estimado):**")
                     tab = piores[["horario_comp", "distancia_km", "endereco_comp"]].copy()
                     tab.columns = ["Horário", "Erro (km)", "Endereço Estimado"]
-                    st.dataframe(tab, use_container_width=True, hide_index=True)
+                    st.dataframe(tab, width='stretch', hide_index=True)
             with st.expander(f"Ver tabela completa ({len(df)} registros)"):
-                st.dataframe(df, use_container_width=True, hide_index=True)
+                st.dataframe(df, width='stretch', hide_index=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -411,17 +411,17 @@ def _rede_um(df_raw, titulo, df_prec=None, kid="x", expandir=False):
             fig = go.Figure(go.Pie(labels=tech_counts.index, values=tech_counts.values,
                 hole=0.55, marker=dict(colors=COLORS_TECH)))
             fig.update_layout(title="Tecnologia de Rede (2G / 3G / 4G)")
-            st.plotly_chart(aplica_tema(fig), use_container_width=True, key=f"pietech_{kid}")
+            st.plotly_chart(aplica_tema(fig), width='stretch', key=f"pietech_{kid}")
         with c2c:
             cores = [SR_RED if o == "TIM" else SR_SLATE if o == "Claro"
                      else "#2477b3" if o == "Vivo" else "#9aa7b3" for o in op_counts.index]
             fig = go.Figure(go.Bar(x=op_counts.index, y=op_counts.values, marker_color=cores,
                 text=op_counts.values, textposition="outside"))
             fig.update_layout(title="Registros por Operadora", showlegend=False)
-            st.plotly_chart(aplica_tema(fig), use_container_width=True, key=f"barop_{kid}")
+            st.plotly_chart(aplica_tema(fig), width='stretch', key=f"barop_{kid}")
         tab = pd.DataFrame({"Tecnologia": tech_counts.index, "Registros": tech_counts.values,
             "%": (tech_counts.values/total*100).round(1)})
-        st.dataframe(tab, use_container_width=True, hide_index=True)
+        st.dataframe(tab, width='stretch', hide_index=True)
         op_pct = (op_counts/total*100).round(1)
         grid(*[tile(k, f"{v}%", f"{op_counts[k]:,} reg.", "amber" if k == "Claro" else "")
                for k, v in op_pct.items()])
@@ -430,13 +430,13 @@ def _rede_um(df_raw, titulo, df_prec=None, kid="x", expandir=False):
             fig = go.Figure(go.Pie(labels=tt.index, values=tt.values, hole=0.55,
                 marker=dict(colors=[SR_RED, "#2477b3", SR_SLATE][:len(tt)])))
             fig.update_layout(title="Tipo de Transmissão (UDP / SMS / outros)")
-            st.plotly_chart(aplica_tema(fig, 260), use_container_width=True, key=f"pitt_{kid}")
+            st.plotly_chart(aplica_tema(fig, 260), width='stretch', key=f"pitt_{kid}")
         if "networktype" in df_raw.columns and df_raw["networktype"].notna().any():
             nt = df_raw["networktype"].value_counts()
             fig = go.Figure(go.Bar(x=nt.index, y=nt.values, marker_color=SR_RED,
                 text=nt.values, textposition="outside"))
             fig.update_layout(title="Network Type (LTE / GSM / ...)", showlegend=False)
-            st.plotly_chart(aplica_tema(fig, 240), use_container_width=True, key=f"bnt_{kid}")
+            st.plotly_chart(aplica_tema(fig, 240), width='stretch', key=f"bnt_{kid}")
         # Frequência por banda do modem (GSM850/900/1800/1900, LTE B3/B5/B7/B28...)
         if "_banda" in df_raw.columns and (df_raw["_banda"] != "—").any():
             st.markdown("**📡 Frequência / Banda do modem**")
@@ -452,21 +452,26 @@ def _rede_um(df_raw, titulo, df_prec=None, kid="x", expandir=False):
                 text=[f"{v}<br>{v/base_b*100:.1f}%" for v in banda_counts.values],
                 textposition="outside"))
             fig.update_layout(title="Registros por Banda de Frequência", showlegend=False)
-            st.plotly_chart(aplica_tema(fig, 280), use_container_width=True, key=f"bband_{kid}")
+            st.plotly_chart(aplica_tema(fig, 280), width='stretch', key=f"bband_{kid}")
             tabb = pd.DataFrame({
                 "Banda": banda_counts.index, "Registros": banda_counts.values,
                 "%": (banda_counts.values / base_b * 100).round(1)})
-            st.dataframe(tabb, use_container_width=True, hide_index=True)
+            st.dataframe(tabb, width='stretch', hide_index=True)
         if df_prec is not None and "_tech_comp" in df_prec.columns and len(df_prec) > 0:
             dfb = df_prec[["_tech_comp", "distancia_km"]].dropna()
             if len(dfb) > 0:
                 fig = px.box(dfb, x="_tech_comp", y="distancia_km",
                     title="Erro de Posição × Tecnologia de Rede", color="_tech_comp",
                     color_discrete_sequence=COLORS_TECH)
-                st.plotly_chart(aplica_tema(fig), use_container_width=True, key=f"box_{kid}")
+                st.plotly_chart(aplica_tema(fig), width='stretch', key=f"box_{kid}")
 
 
 def aba_rede(resultados, df_ref, ref_nome, comparacao, dados):
+    # Modo individual: sem referência, analisa cada peça de "dados"
+    if df_ref is None or len(df_ref) == 0:
+        for ci, item in enumerate(dados):
+            _rede_um(item["df"], item["arquivo"], kid=f"i{ci}", expandir=(ci == 0))
+        return
     _rede_um(df_ref, f"Referência — {ref_nome}", kid="ref", expandir=True)
     for ci, nome in enumerate(comparacao):
         item = next((d for d in dados if d["arquivo"] == nome), None)
@@ -495,13 +500,13 @@ def _gps_um(df_raw, titulo, kid="x", expandir=False):
             with c1:
                 fig = px.histogram(df_raw, x="satellitenumber", nbins=20,
                     title="Distribuição de Satélites", color_discrete_sequence=[SR_RED])
-                st.plotly_chart(aplica_tema(fig), use_container_width=True, key=f"sathist_{kid}")
+                st.plotly_chart(aplica_tema(fig), width='stretch', key=f"sathist_{kid}")
             with c2:
                 if "datetime_module" in df_raw.columns:
                     dfs = df_raw.dropna(subset=["satellitenumber", "datetime_module"]).sort_values("datetime_module")
                     fig = px.line(dfs, x="datetime_module", y="satellitenumber",
                         title="Satélites ao Longo do Tempo", color_discrete_sequence=["#2477b3"])
-                    st.plotly_chart(aplica_tema(fig), use_container_width=True, key=f"satline_{kid}")
+                    st.plotly_chart(aplica_tema(fig), width='stretch', key=f"satline_{kid}")
         if tem_dop and "datetime_module" in df_raw.columns:
             fig = go.Figure()
             for col, cor in [("hdop", SR_RED), ("vdop", "#2477b3"), ("sdop", "#f59e0b")]:
@@ -510,16 +515,21 @@ def _gps_um(df_raw, titulo, kid="x", expandir=False):
                     fig.add_trace(go.Scatter(x=dfs["datetime_module"], y=dfs[col],
                         mode="lines", name=col.upper(), line=dict(color=cor)))
             fig.update_layout(title="Diluição de Precisão (DOP) — menor é melhor")
-            st.plotly_chart(aplica_tema(fig, 280), use_container_width=True, key=f"dop_{kid}")
+            st.plotly_chart(aplica_tema(fig, 280), width='stretch', key=f"dop_{kid}")
         if "altitude" in df_raw.columns and df_raw["altitude"].notna().any() and "datetime_module" in df_raw.columns:
             dfs = df_raw.dropna(subset=["altitude", "datetime_module"]).sort_values("datetime_module")
             fig = px.area(dfs, x="datetime_module", y="altitude", title="Altitude (m)",
                 color_discrete_sequence=[SR_SLATE])
             fig.update_traces(line_color=SR_SLATE)
-            st.plotly_chart(aplica_tema(fig, 240), use_container_width=True, key=f"alt_{kid}")
+            st.plotly_chart(aplica_tema(fig, 240), width='stretch', key=f"alt_{kid}")
 
 
 def aba_qualidade_gps(df_ref, ref_nome, comparacao, dados):
+    # Modo individual: sem referência, analisa cada peça de "dados"
+    if df_ref is None or len(df_ref) == 0:
+        for ci, item in enumerate(dados):
+            _gps_um(item["df"], item["arquivo"], kid=f"i{ci}", expandir=(ci == 0))
+        return
     _gps_um(df_ref, f"Referência — {ref_nome}", kid="ref", expandir=True)
     for ci, nome in enumerate(comparacao):
         item = next((d for d in dados if d["arquivo"] == nome), None)
@@ -552,14 +562,14 @@ def _mov_um(df_raw, titulo, kid="x", expandir=False):
                     dfs = df_raw.dropna(subset=["speed", "datetime_module"]).sort_values("datetime_module")
                     fig = px.line(dfs, x="datetime_module", y="speed",
                         title="Velocidade ao Longo do Tempo (km/h)", color_discrete_sequence=[SR_RED])
-                    st.plotly_chart(aplica_tema(fig), use_container_width=True, key=f"spd_{kid}")
+                    st.plotly_chart(aplica_tema(fig), width='stretch', key=f"spd_{kid}")
             with c2:
                 mov = spd[spd > 0]
                 if len(mov) > 0:
                     fig = px.histogram(mov, nbins=25, title="Distribuição de Velocidade (em movimento)",
                         color_discrete_sequence=["#2477b3"])
                     fig.update_layout(showlegend=False)
-                    st.plotly_chart(aplica_tema(fig), use_container_width=True, key=f"spdhist_{kid}")
+                    st.plotly_chart(aplica_tema(fig), width='stretch', key=f"spdhist_{kid}")
                 else:
                     st.info("Equipamento permaneceu parado durante todo o período.")
         if "heading" in df_raw.columns and df_raw["heading"].notna().any():
@@ -573,17 +583,22 @@ def _mov_um(df_raw, titulo, kid="x", expandir=False):
                 polar=dict(bgcolor="#f5f7fa", radialaxis=dict(color="#1f2a36"),
                     angularaxis=dict(color="#1f2a36")),
                 paper_bgcolor="#ffffff", font=dict(family="Barlow", color="#1f2a36"), height=340)
-            st.plotly_chart(fig, use_container_width=True, key=f"head_{kid}")
+            st.plotly_chart(fig, width='stretch', key=f"head_{kid}")
         if "_movimento" in df_raw.columns:
             mc = df_raw["_movimento"].value_counts()
             lbls = ["Em movimento" if i else "Parado" for i in mc.index]
             fig = go.Figure(go.Pie(labels=lbls, values=mc.values, hole=0.55,
                 marker=dict(colors=["#1f8b4c", "#9aa7b3"])))
             fig.update_layout(title="Sensor de Movimento")
-            st.plotly_chart(aplica_tema(fig, 260), use_container_width=True, key=f"movsens_{kid}")
+            st.plotly_chart(aplica_tema(fig, 260), width='stretch', key=f"movsens_{kid}")
 
 
 def aba_movimento(df_ref, ref_nome, comparacao, dados):
+    # Modo individual: sem referência, analisa cada peça de "dados"
+    if df_ref is None or len(df_ref) == 0:
+        for ci, item in enumerate(dados):
+            _mov_um(item["df"], item["arquivo"], kid=f"i{ci}", expandir=(ci == 0))
+        return
     _mov_um(df_ref, f"Referência — {ref_nome}", kid="ref", expandir=True)
     for ci, nome in enumerate(comparacao):
         item = next((d for d in dados if d["arquivo"] == nome), None)
@@ -615,15 +630,20 @@ def _bat_um(df_raw, titulo, kid="x", expandir=False):
             annotation_text="Crítico (<20%)", annotation_font_color="#ef4444")
         fig.add_hrect(y0=20, y1=50, fillcolor="#f59e0b", opacity=0.07, line_width=0)
         fig.update_layout(yaxis=dict(range=[0, 105], title="Bateria (%)"))
-        st.plotly_chart(aplica_tema(fig), use_container_width=True, key=f"bat_{kid}")
+        st.plotly_chart(aplica_tema(fig), width='stretch', key=f"bat_{kid}")
         if "voltage" in df_raw.columns and df_raw["voltage"].notna().any():
             dfv = df_raw.dropna(subset=["voltage", "datetime_module"]).sort_values("datetime_module")
             fig = px.line(dfv, x="datetime_module", y="voltage", title="Tensão (V)",
                 color_discrete_sequence=["#2477b3"])
-            st.plotly_chart(aplica_tema(fig, 240), use_container_width=True, key=f"volt_{kid}")
+            st.plotly_chart(aplica_tema(fig, 240), width='stretch', key=f"volt_{kid}")
 
 
 def aba_bateria(df_ref, ref_nome, comparacao, dados):
+    # Modo individual: sem referência, analisa cada peça de "dados"
+    if df_ref is None or len(df_ref) == 0:
+        for ci, item in enumerate(dados):
+            _bat_um(item["df"], item["arquivo"], kid=f"i{ci}", expandir=(ci == 0))
+        return
     _bat_um(df_ref, f"Referência — {ref_nome}", kid="ref", expandir=True)
     for ci, nome in enumerate(comparacao):
         item = next((d for d in dados if d["arquivo"] == nome), None)
@@ -660,7 +680,7 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
             fig = go.Figure(go.Bar(x=cc.index, y=cc.values, marker_color=LATENCIA_CORES,
                 text=cc.values.astype(int), textposition="outside"))
             fig.update_layout(title="Distribuição de Latência por Faixa", showlegend=False)
-            st.plotly_chart(aplica_tema(fig), use_container_width=True, key=f"lat_{kid}")
+            st.plotly_chart(aplica_tema(fig), width='stretch', key=f"lat_{kid}")
         with c2:
             if "bufferstatus" in df_raw.columns and df_raw["bufferstatus"].notna().any():
                 buf = df_raw["bufferstatus"].astype(str).value_counts()
@@ -668,12 +688,17 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
                 fig = go.Figure(go.Pie(labels=lbls, values=buf.values, hole=0.55,
                     marker=dict(colors=[SR_RED, "#2477b3"])))
                 fig.update_layout(title="Buffer Status")
-                st.plotly_chart(aplica_tema(fig), use_container_width=True, key=f"buf_{kid}")
+                st.plotly_chart(aplica_tema(fig), width='stretch', key=f"buf_{kid}")
             else:
                 st.info("Campo bufferstatus não disponível.")
 
 
 def aba_latencia(df_ref, ref_nome, comparacao, dados):
+    # Modo individual: sem referência, analisa cada peça de "dados"
+    if df_ref is None or len(df_ref) == 0:
+        for ci, item in enumerate(dados):
+            _lat_um(item["df"], item["arquivo"], kid=f"i{ci}", expandir=(ci == 0))
+        return
     _lat_um(df_ref, f"Referência — {ref_nome}", kid="ref", expandir=True)
     for ci, nome in enumerate(comparacao):
         item = next((d for d in dados if d["arquivo"] == nome), None)
@@ -722,7 +747,7 @@ def aba_raio_sistema(resultados):
                     labels=["Dentro do raio", "Fora do raio"], values=[dentro, fora],
                     hole=0.55, marker=dict(colors=["#1f8b4c", SR_RED])))
                 fig.update_layout(title="Posições dentro × fora do raio do sistema")
-                st.plotly_chart(aplica_tema(fig), use_container_width=True, key=f"raio_pie_{ci}")
+                st.plotly_chart(aplica_tema(fig), width='stretch', key=f"raio_pie_{ci}")
             with cR:
                 # Distância medida vs raio do sistema, ao longo do tempo
                 if "horario_comp" in val.columns:
@@ -735,7 +760,7 @@ def aba_raio_sistema(resultados):
                         name="Distância medida", mode="markers",
                         marker=dict(size=5, color=SR_RED)))
                     fig.update_layout(title="Distância medida × Raio do sistema")
-                    st.plotly_chart(aplica_tema(fig, 300), use_container_width=True, key=f"raio_ts_{ci}")
+                    st.plotly_chart(aplica_tema(fig, 300), width='stretch', key=f"raio_ts_{ci}")
 
             st.markdown("**Pontos que ficaram fora do raio do sistema (maiores excedentes):**")
             fora_df = val[~val["dentro_raio"]].copy()
@@ -748,7 +773,7 @@ def aba_raio_sistema(resultados):
                        "raio_km": "Raio sistema (km)", "excedente_km": "Excedente (km)",
                        "endereco_comp": "Endereço estimado"}
                 tab.columns = [ren.get(c, c) for c in tab.columns]
-                st.dataframe(tab, use_container_width=True, hide_index=True)
+                st.dataframe(tab, width='stretch', hide_index=True)
             else:
                 st.success("Todas as posições avaliadas ficaram dentro do raio do sistema.")
 
