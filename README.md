@@ -122,3 +122,6 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
 ## v0.10.1
 - Modo **Individual** confirmado e testado (inspecionar uma ou várias peças isoladamente — bateria, rede, banda, GPS, movimento, latência — sem exigir comparação).
 - Correção técnica: substituído o parâmetro `use_container_width` (que o Streamlit removerá após 2025) por `width='stretch'`, evitando quebra futura. Versão mínima do Streamlit ajustada para 1.49.
+
+## v0.10.2
+- Correção no histórico: download de arquivos do Drive público passou a usar a URL direta (uc?export=download), mais robusta que o get_media+API Key, que retornava 403 ("automated queries"). Fallback para o método anterior mantido.
