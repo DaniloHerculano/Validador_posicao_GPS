@@ -395,11 +395,12 @@ def _rede_um(df_raw, titulo, df_prec=None, kid="x", expandir=False):
         c3 = df_raw["_tech"].str.startswith("3G").sum()
         c2 = df_raw["_tech"].str.startswith("2G").sum()
         cn = (df_raw["_tech"] == "Sem Sinal").sum()
-        rt = c4 + c3 + c2
-        p4 = round(c4/rt*100, 1) if rt else 0
-        p3 = round(c3/rt*100, 1) if rt else 0
-        p2 = round(c2/rt*100, 1) if rt else 0
+        # Base única = todos os registros técnicos (inclui Sem Sinal) para consistência
+        p4 = round(c4/total*100, 1) if total else 0
+        p3 = round(c3/total*100, 1) if total else 0
+        p2 = round(c2/total*100, 1) if total else 0
         pn = round(cn/total*100, 1) if total else 0
+        st.caption(f"Base: {total:,} registros técnicos (CSV). Percentuais sobre o total.")
         grid(
             tile("4G", f"{c4:,}", f"{p4}%", "green"),
             tile("3G", f"{c3:,}", f"{p3}%", "amber"),
@@ -466,17 +467,24 @@ def _rede_um(df_raw, titulo, df_prec=None, kid="x", expandir=False):
                 st.plotly_chart(aplica_tema(fig), width='stretch', key=f"box_{kid}")
 
 
+def _dtec(item):
+    """Retorna o dataframe técnico completo (CSV) do equipamento, se houver."""
+    return item.get("df_tecnico", item["df"]) if item else None
+
+
 def aba_rede(resultados, df_ref, ref_nome, comparacao, dados):
     # Modo individual: sem referência, analisa cada peça de "dados"
     if df_ref is None or len(df_ref) == 0:
         for ci, item in enumerate(dados):
-            _rede_um(item["df"], item["arquivo"], kid=f"i{ci}", expandir=(ci == 0))
+            _rede_um(_dtec(item), item["arquivo"], kid=f"i{ci}", expandir=(ci == 0))
         return
-    _rede_um(df_ref, f"Referência — {ref_nome}", kid="ref", expandir=True)
+    ref_item = next((d for d in dados if d["arquivo"] == ref_nome), None)
+    _rede_um(_dtec(ref_item) if ref_item else df_ref,
+             f"Referência — {ref_nome}", kid="ref", expandir=True)
     for ci, nome in enumerate(comparacao):
         item = next((d for d in dados if d["arquivo"] == nome), None)
         if item:
-            _rede_um(item["df"], nome, df_prec=resultados.get(nome), kid=f"c{ci}")
+            _rede_um(_dtec(item), nome, df_prec=resultados.get(nome), kid=f"c{ci}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -528,13 +536,15 @@ def aba_qualidade_gps(df_ref, ref_nome, comparacao, dados):
     # Modo individual: sem referência, analisa cada peça de "dados"
     if df_ref is None or len(df_ref) == 0:
         for ci, item in enumerate(dados):
-            _gps_um(item["df"], item["arquivo"], kid=f"i{ci}", expandir=(ci == 0))
+            _gps_um(_dtec(item), item["arquivo"], kid=f"i{ci}", expandir=(ci == 0))
         return
-    _gps_um(df_ref, f"Referência — {ref_nome}", kid="ref", expandir=True)
+    ref_item = next((d for d in dados if d["arquivo"] == ref_nome), None)
+    _gps_um(_dtec(ref_item) if ref_item else df_ref,
+            f"Referência — {ref_nome}", kid="ref", expandir=True)
     for ci, nome in enumerate(comparacao):
         item = next((d for d in dados if d["arquivo"] == nome), None)
         if item:
-            _gps_um(item["df"], nome, kid=f"c{ci}")
+            _gps_um(_dtec(item), nome, kid=f"c{ci}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -697,13 +707,15 @@ def aba_latencia(df_ref, ref_nome, comparacao, dados):
     # Modo individual: sem referência, analisa cada peça de "dados"
     if df_ref is None or len(df_ref) == 0:
         for ci, item in enumerate(dados):
-            _lat_um(item["df"], item["arquivo"], kid=f"i{ci}", expandir=(ci == 0))
+            _lat_um(_dtec(item), item["arquivo"], kid=f"i{ci}", expandir=(ci == 0))
         return
-    _lat_um(df_ref, f"Referência — {ref_nome}", kid="ref", expandir=True)
+    ref_item = next((d for d in dados if d["arquivo"] == ref_nome), None)
+    _lat_um(_dtec(ref_item) if ref_item else df_ref,
+            f"Referência — {ref_nome}", kid="ref", expandir=True)
     for ci, nome in enumerate(comparacao):
         item = next((d for d in dados if d["arquivo"] == nome), None)
         if item:
-            _lat_um(item["df"], nome, kid=f"c{ci}")
+            _lat_um(_dtec(item), nome, kid=f"c{ci}")
 
 # ══════════════════════════════════════════════════════════════════════════════
 def aba_raio_sistema(resultados):
