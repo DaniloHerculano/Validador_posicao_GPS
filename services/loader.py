@@ -295,4 +295,5 @@ def consolidar_equipamento(nome, csv_file, xls_file, kml_file=None, tol_fusao=60
 
     return {"arquivo": nome, "pin": extrair_pin(nome), "modelo": extrair_modelo(nome),
             "tipo": tipo, "fonte": fonte, "registros": len(df),
-            "tem_raio": tem_raio, "df": df}
+            "tem_raio": tem_raio, "df": df,
+            "df_tecnico": df_csv if df_csv is not None else df}
