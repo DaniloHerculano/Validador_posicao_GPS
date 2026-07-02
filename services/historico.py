@@ -76,6 +76,35 @@ def baixar_arquivos(pasta_id: str) -> dict:
 
 
 def _baixar_bytes(svc, file_id: str) -> bytes:
+    """
+    Baixa o conteúdo de um arquivo público. Usa a URL direta de download do Drive
+    (uc?export=download), que é mais robusta para arquivos públicos do que o
+    get_media da API + API Key (este último costuma retornar 403 anti-bot).
+    Faz fallback para o get_media caso a URL direta falhe.
+    """
+    import requests
+    # 1) Tentativa principal: URL direta de download de arquivo público
+    try:
+        url = "https://drive.google.com/uc"
+        params = {"export": "download", "id": file_id}
+        sess = requests.Session()
+        r = sess.get(url, params=params, timeout=60, stream=True)
+        # Arquivos grandes exibem página de confirmação com token; tratamos se aparecer
+        token = None
+        for k, v in r.cookies.items():
+            if k.startswith("download_warning"):
+                token = v
+        if token:
+            r = sess.get(url, params={**params, "confirm": token}, timeout=60, stream=True)
+        conteudo = r.content
+        # Se voltou HTML (bloqueio/erro), dispara fallback
+        ct = r.headers.get("Content-Type", "")
+        if r.status_code == 200 and not ct.startswith("text/html"):
+            return conteudo
+    except Exception:
+        pass
+
+    # 2) Fallback: get_media da API (pode falhar com 403 em alguns casos)
     from googleapiclient.http import MediaIoBaseDownload
     req = svc.files().get_media(fileId=file_id, supportsAllDrives=True)
     buf = io.BytesIO()
