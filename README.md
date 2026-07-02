@@ -125,3 +125,8 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
 
 ## v0.10.2
 - Correção no histórico: download de arquivos do Drive público passou a usar a URL direta (uc?export=download), mais robusta que o get_media+API Key, que retornava 403 ("automated queries"). Fallback para o método anterior mantido.
+
+## v0.10.3
+- **Correção importante nas análises técnicas (Rede, GPS, Latência):** passavam a contar apenas os registros do CSV que casaram no tempo com o XLS (via merge), subcontando pela metade. Agora usam o CSV técnico completo (df_tecnico), refletindo todos os registros. Ex.: 4G que aparecia como 213 agora mostra os 405 reais.
+- **Correção de percentuais inconsistentes na aba Rede:** tecnologia e operadora usavam bases diferentes (uma excluía "Sem Sinal", outra não), fazendo os % não fecharem. Agora ambas usam a mesma base (total de registros técnicos), com legenda indicando a base.
+- Confirmado: ausência de SMS nos dados é real (transmissão 100% UDP), não é falha.
