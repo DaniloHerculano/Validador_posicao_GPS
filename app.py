@@ -46,7 +46,7 @@ with st.sidebar:
     raio3 = st.number_input("Raio 3 (km)", value=5.0, step=0.5, min_value=0.1)
     st.markdown("---")
     botao_sair()
-    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.10</span>',
+    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.11</span>',
                 unsafe_allow_html=True)
 
 # ── AJUDA RÁPIDA ──────────────────────────────────────────────────────────────
@@ -152,43 +152,68 @@ reais = [rotulo(d) for d in dados if d["tipo"] == "GPS Real"]
 todos = [rotulo(d) for d in dados]
 cand = reais if reais else todos
 
-cR, cC = st.columns([1, 2])
-with cR:
-    ref_rot = st.selectbox("🔵 Referência (GPS Real)", cand,
-        help="Rastreador com GPS ligado — geralmente o RI130")
-with cC:
-    opc = [r for r in todos if r != ref_rot]
-    comp_rot = st.multiselect("🟠 Comparar com", opc, default=opc)
+# Modo de análise: comparativo (referência × amostras) ou individual (uma peça)
+modo = st.radio(
+    "Modo de análise",
+    ["Comparativo (referência × amostras)", "Individual (inspecionar peças, sem comparar)"],
+    horizontal=True,
+    help="No modo individual você vê consumo, rede, GPS, latência etc. de cada peça, "
+         "sem precisar de uma referência para comparar posição.")
+modo_individual = modo.startswith("Individual")
 
-referencia = mapa_rotulo[ref_rot]
-comparacao = [mapa_rotulo[r] for r in comp_rot]
+if modo_individual:
+    referencia = None
+    comparacao = []
+    btn = st.button("🚀  ANALISAR PEÇAS")
+    if not btn and not st.session_state.get("modo_individual"):
+        st.stop()
+    if btn:
+        st.session_state.update({
+            "resultados": {}, "ref_nome": "", "ref_df": pd.DataFrame(),
+            "comparacao": [], "raios": (raio1, raio2, raio3),
+            "modo_individual": True})
+else:
+    cR, cC = st.columns([1, 2])
+    with cR:
+        ref_rot = st.selectbox("🔵 Referência (GPS Real)", cand,
+            help="Rastreador com GPS ligado — geralmente o RI130")
+    with cC:
+        opc = [r for r in todos if r != ref_rot]
+        comp_rot = st.multiselect("🟠 Comparar com", opc, default=opc)
 
-if not comparacao:
-    st.warning("Selecione ao menos um rastreador para comparar.")
-    st.stop()
+    referencia = mapa_rotulo[ref_rot]
+    comparacao = [mapa_rotulo[r] for r in comp_rot]
 
-btn = st.button("🚀  INICIAR ANÁLISE COMPLETA")
-if not btn and "resultados" not in st.session_state:
-    st.stop()
+    if not comparacao:
+        st.warning("Selecione ao menos um rastreador para comparar, "
+                   "ou mude para o modo **Individual** acima.")
+        st.stop()
 
-if btn:
-    ref_item = next(d for d in dados if d["arquivo"] == referencia)
-    df_ref = ref_item["df"].copy()
-    resultados = {}
-    with st.spinner("Sincronizando e calculando distâncias..."):
-        for nome in comparacao:
-            item = next(d for d in dados if d["arquivo"] == nome)
-            resultados[nome] = sincronizar(df_ref, item["df"].copy(), tolerancia)
-    st.session_state.update({"resultados": resultados, "ref_nome": referencia,
-        "ref_df": df_ref, "comparacao": comparacao, "raios": (raio1, raio2, raio3),
-        "dados_meta": {d["arquivo"]: {k: d[k] for k in ("modelo","pin","tipo","fonte")} for d in dados}})
+    btn = st.button("🚀  INICIAR ANÁLISE COMPLETA")
+    if not btn and not st.session_state.get("resultados"):
+        st.stop()
+
+    if btn:
+        ref_item = next(d for d in dados if d["arquivo"] == referencia)
+        df_ref = ref_item["df"].copy()
+        resultados = {}
+        with st.spinner("Sincronizando e calculando distâncias..."):
+            for nome in comparacao:
+                item = next(d for d in dados if d["arquivo"] == nome)
+                resultados[nome] = sincronizar(df_ref, item["df"].copy(), tolerancia)
+        st.session_state.update({"resultados": resultados, "ref_nome": referencia,
+            "ref_df": df_ref, "comparacao": comparacao, "raios": (raio1, raio2, raio3),
+            "modo_individual": False,
+            "dados_meta": {d["arquivo"]: {k: d[k] for k in ("modelo","pin","tipo","fonte")} for d in dados}})
 
 resultados = st.session_state.get("resultados", {})
 df_ref = st.session_state.get("ref_df", pd.DataFrame())
 comparacao = st.session_state.get("comparacao", [])
 raios = st.session_state.get("raios", (1.0, 3.0, 5.0))
 ref_nome = st.session_state.get("ref_nome", "")
-if not resultados:
+eh_individual = st.session_state.get("modo_individual", False)
+
+if not eh_individual and not resultados:
     st.stop()
 
 # Avisos sobre sincronizações vazias
@@ -198,22 +223,49 @@ if vazios:
                ". Verifique se há sobreposição de horário ou aumente a tolerância.")
 
 # ── ABAS ──────────────────────────────────────────────────────────────────────
-abas = st.tabs(["📊 Visão Geral", "🗺 Mapa", "📍 Precisão GPS", "🎯 Raio do Sistema",
-    "📶 Rede & Operadora", "🛰 Qualidade GPS", "🚗 Movimento", "🔋 Bateria", "⏱ Latência",
-    "📋 Dados & Export", "💾 Histórico", "❓ Como Usar"])
+if eh_individual:
+    # Modo individual: só as análises que fazem sentido por peça (sem comparação)
+    abas = st.tabs(["📶 Rede & Operadora", "🛰 Qualidade GPS", "🚗 Movimento",
+        "🔋 Bateria", "⏱ Latência", "📋 Dados", "💾 Histórico", "❓ Como Usar"])
+    vazio_df = pd.DataFrame()
+    with abas[0]: g.aba_rede({}, vazio_df, "", [], dados)
+    with abas[1]: g.aba_qualidade_gps(vazio_df, "", [], dados)
+    with abas[2]: g.aba_movimento(vazio_df, "", [], dados)
+    with abas[3]: g.aba_bateria(vazio_df, "", [], dados)
+    with abas[4]: g.aba_latencia(vazio_df, "", [], dados)
+    with abas[7]: render_ajuda()
+    with abas[6]:
+        sec("Histórico de Relatórios")
+        st.caption("O seletor de histórico está no topo da página (seção Importar Arquivos).")
+    with abas[5]:
+        sec("Dados por Equipamento")
+        sel = st.selectbox("Equipamento", [d["arquivo"] for d in dados], key="sel_ind")
+        item = next(d for d in dados if d["arquivo"] == sel)
+        cols = [c for c in item["df"].columns if not c.startswith("_")]
+        st.dataframe(item["df"][cols].head(2000), width='stretch', hide_index=True)
+        st.caption(f"Fonte: {item['fonte']} · até 2000 de {len(item['df'])} registros · "
+                   f"PIN {item['pin']} · Tipo: {item['tipo']}")
+        st.download_button("📥 Baixar CSV deste equipamento",
+            data=item["df"][cols].to_csv(index=False).encode("utf-8"),
+            file_name=f"{nome_arquivo_seguro(sel)}.csv", mime="text/csv", key="dl_ind")
+else:
+    abas = st.tabs(["📊 Visão Geral", "🗺 Mapa", "📍 Precisão GPS", "🎯 Raio do Sistema",
+        "📶 Rede & Operadora", "🛰 Qualidade GPS", "🚗 Movimento", "🔋 Bateria", "⏱ Latência",
+        "📋 Dados & Export", "💾 Histórico", "❓ Como Usar"])
 
-with abas[0]: g.aba_visao_geral(resultados, df_ref, ref_nome, raios)
-with abas[1]: g.aba_mapa(resultados, df_ref, ref_nome)
-with abas[2]: g.aba_precisao(resultados, raios)
-with abas[3]: g.aba_raio_sistema(resultados)
-with abas[4]: g.aba_rede(resultados, df_ref, ref_nome, comparacao, dados)
-with abas[5]: g.aba_qualidade_gps(df_ref, ref_nome, comparacao, dados)
-with abas[6]: g.aba_movimento(df_ref, ref_nome, comparacao, dados)
-with abas[7]: g.aba_bateria(df_ref, ref_nome, comparacao, dados)
-with abas[8]: g.aba_latencia(df_ref, ref_nome, comparacao, dados)
-with abas[11]: render_ajuda()
+    with abas[0]: g.aba_visao_geral(resultados, df_ref, ref_nome, raios)
+    with abas[1]: g.aba_mapa(resultados, df_ref, ref_nome)
+    with abas[2]: g.aba_precisao(resultados, raios)
+    with abas[3]: g.aba_raio_sistema(resultados)
+    with abas[4]: g.aba_rede(resultados, df_ref, ref_nome, comparacao, dados)
+    with abas[5]: g.aba_qualidade_gps(df_ref, ref_nome, comparacao, dados)
+    with abas[6]: g.aba_movimento(df_ref, ref_nome, comparacao, dados)
+    with abas[7]: g.aba_bateria(df_ref, ref_nome, comparacao, dados)
+    with abas[8]: g.aba_latencia(df_ref, ref_nome, comparacao, dados)
+    with abas[11]: render_ajuda()
 
-with abas[9]:
+if not eh_individual:
+  with abas[9]:
     sec("Exportar Análise Completa")
     st.caption("Excel com Resumo, dados sincronizados por equipamento e consolidado Rede & Bateria.")
     df_resumo = st.session_state.get("df_resumo")
@@ -234,7 +286,7 @@ with abas[9]:
     for nome, df in resultados.items():
         st.markdown(f"**{nome}** — {len(df)} sincronizações")
         if len(df) > 0:
-            st.dataframe(df, use_container_width=True, hide_index=True)
+            st.dataframe(df, width='stretch', hide_index=True)
             st.download_button(f"📥 CSV — {nome}",
                 data=df.to_csv(index=False).encode("utf-8"),
                 file_name=f"sync_{nome_arquivo_seguro(nome)}.csv",
@@ -246,11 +298,12 @@ with abas[9]:
     sel = st.selectbox("Equipamento", [d["arquivo"] for d in dados], key="sel_bruto")
     item = next(d for d in dados if d["arquivo"] == sel)
     cols = [c for c in item["df"].columns if not c.startswith("_")]
-    st.dataframe(item["df"][cols].head(1000), use_container_width=True, hide_index=True)
+    st.dataframe(item["df"][cols].head(1000), width='stretch', hide_index=True)
     st.caption(f"Fonte: {item['fonte']} · até 1000 de {len(item['df'])} registros · PIN {item['pin']}")
 
 # ── ABA HISTÓRICO ─────────────────────────────────────────────────────────────
-with abas[10]:
+if not eh_individual:
+  with abas[10]:
     sec("Histórico de Relatórios")
     st.caption("Abra um teste já salvo na pasta do Google Drive, sem precisar enviar os "
                "arquivos novamente. Cada subpasta da pasta de histórico é um teste.")
