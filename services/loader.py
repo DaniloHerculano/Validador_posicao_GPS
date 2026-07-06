@@ -205,6 +205,98 @@ def normalizar_xls(df_xls: pd.DataFrame) -> pd.DataFrame:
 
 
 # ── Enriquecimento do CSV ─────────────────────────────────────────────────────
+def eh_formato_firmware_completo(arquivo) -> bool:
+    """
+    Detecta se um CSV é o novo formato único do gerenciamento de firmware,
+    que já traz posição, raio, estimada, endereço e dados técnicos juntos.
+    Assinatura: presença simultânea das colunas 'estimada', 'radius' e 'bufferstatus'.
+    """
+    try:
+        if hasattr(arquivo, "seek"):
+            arquivo.seek(0)
+        cab = pd.read_csv(arquivo, sep=";", nrows=0)
+        cols = {c.strip().lower() for c in cab.columns}
+        if hasattr(arquivo, "seek"):
+            arquivo.seek(0)
+        return {"estimada", "radius", "bufferstatus"}.issubset(cols)
+    except Exception:
+        return False
+
+
+def ler_firmware_completo(arquivo) -> pd.DataFrame:
+    """
+    Lê o arquivo único do gerenciamento de firmware e produz um dataframe
+    normalizado com as mesmas colunas internas que o app usa (equivalente ao
+    resultado de CSV+XLS+KML fundidos), permitindo reaproveitar toda a análise.
+    """
+    df = pd.read_csv(arquivo, sep=";", low_memory=False)
+    df.columns = [c.strip().lower() for c in df.columns]
+
+    # Datas
+    for col in ["datetime_module", "datetime_server", "datetime_gps",
+                "datetime_trilateration"]:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors="coerce")
+
+    # Numéricos
+    for col in ["latitude", "longitude", "altitude", "heading", "speed",
+                "hdop", "vdop", "sdop", "satellitenumber", "voltage", "radius",
+                "internalbatterylevel", "xaccel", "yaccel", "zaccel"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # ── Posição estimada (t/f) — campo confiável e sempre preenchido ──
+    if "estimada" in df.columns:
+        df["_estimada_bool"] = df["estimada"].astype(str).str.strip().str.lower().isin(
+            ["t", "true", "1", "sim"])
+
+    # ── GPS válido: a coluna 'gps' pode vir vazia (ex.: RI720). Inferimos a
+    #    partir de 'estimada' (não estimada = GPS real/válido) e refinamos com
+    #    'gps' quando disponível. ──
+    gps_txt = df["gps"].astype(str).str.strip().str.lower() if "gps" in df.columns else None
+    if gps_txt is not None and gps_txt.isin(["t", "true", "1"]).any():
+        df["_gps_bool"] = gps_txt.isin(["t", "true", "1"])
+    elif "_estimada_bool" in df.columns:
+        df["_gps_bool"] = ~df["_estimada_bool"]
+    df["_gps_bool_csv"] = df.get("_gps_bool")
+
+    # ── Raio de incerteza (metros → km) ──
+    if "radius" in df.columns:
+        df["raio_km"] = (df["radius"] / 1000.0).round(4)
+
+    # ── Endereço ──
+    if "endereco" in df.columns:
+        df["endereco"] = df["endereco"].astype(str).str.replace(
+            r"^\s*Proximo a:\s*", "", regex=True).replace("nan", pd.NA)
+
+    # ── Rede / operadora / banda ──
+    if "networkinfo" in df.columns:
+        p = df["networkinfo"].apply(parse_networkinfo)
+        df["_tech"] = p.apply(lambda x: x[0])
+        df["_operadora"] = p.apply(lambda x: x[1])
+        df["_banda"] = p.apply(lambda x: x[2])
+
+    # ── Bateria (escala 0-20 → %) ──
+    if "internalbatterylevel" in df.columns:
+        df["_bateria_pct_csv"] = df["internalbatterylevel"].apply(bat_csv_para_pct)
+        df["_bateria_pct"] = df["_bateria_pct_csv"]
+
+    # ── Latência (servidor − módulo) ──
+    if "datetime_module" in df.columns and "datetime_server" in df.columns:
+        df["_latencia_s"] = (df["datetime_server"] - df["datetime_module"]).dt.total_seconds()
+
+    # ── Buffer (t/f) — para separar latência real do atraso de recuperação ──
+    if "bufferstatus" in df.columns:
+        df["_buffer_bool"] = df["bufferstatus"].astype(str).str.strip().str.lower().isin(
+            ["t", "true", "1"])
+
+    # ── Movimento ──
+    if "movementsensor" in df.columns:
+        df["_movimento"] = df["movementsensor"].astype(str).str.lower().isin(["t", "true", "1"])
+
+    return df
+
+
 def enriquecer_csv(df: pd.DataFrame) -> pd.DataFrame:
     if "networkinfo" in df.columns:
         p = df["networkinfo"].apply(parse_networkinfo)
@@ -251,8 +343,31 @@ def _anexar_raio_kml(df, df_kml, tol_seg=60):
     return fundido
 
 
+def _classifica_tipo(df) -> str:
+    if "_estimada_bool" in df.columns and df["_estimada_bool"].notna().any():
+        frac_est = df["_estimada_bool"].mean()
+        if 0.05 < frac_est < 0.95:
+            return "Misto (Real + Estimada)"
+        elif frac_est >= 0.95:
+            return "Posição Estimada"
+        return "GPS Real"
+    return "Desconhecido"
+
+
 def consolidar_equipamento(nome, csv_file, xls_file, kml_file=None, tol_fusao=60) -> dict:
-    """Carrega e funde os arquivos de um equipamento. Posição: XLS > CSV. Raio: KML."""
+    """Carrega e funde os arquivos de um equipamento. Posição: XLS > CSV. Raio: KML.
+    Detecta automaticamente o formato único do firmware (um CSV que contém tudo)."""
+    # ── Formato NOVO: arquivo único do gerenciamento de firmware ──
+    if csv_file is not None and xls_file is None and eh_formato_firmware_completo(csv_file):
+        df = ler_firmware_completo(csv_file)
+        tipo = _classifica_tipo(df)
+        tem_raio = "raio_km" in df.columns and df["raio_km"].notna().any()
+        fonte = "Firmware (único)"
+        return {"arquivo": nome, "pin": extrair_pin(nome), "modelo": extrair_modelo(nome),
+                "tipo": tipo, "fonte": fonte, "registros": len(df),
+                "tem_raio": tem_raio, "df": df, "df_tecnico": df}
+
+    # ── Formato ANTIGO: CSV + XLS + KML separados ──
     df_csv = enriquecer_csv(ler_csv(csv_file)) if csv_file is not None else None
     df_xls = normalizar_xls(ler_xls(xls_file)) if xls_file is not None else None
     df_kml = ler_kml(kml_file) if kml_file is not None else None
