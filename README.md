@@ -130,3 +130,8 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
 - **Correção importante nas análises técnicas (Rede, GPS, Latência):** passavam a contar apenas os registros do CSV que casaram no tempo com o XLS (via merge), subcontando pela metade. Agora usam o CSV técnico completo (df_tecnico), refletindo todos os registros. Ex.: 4G que aparecia como 213 agora mostra os 405 reais.
 - **Correção de percentuais inconsistentes na aba Rede:** tecnologia e operadora usavam bases diferentes (uma excluía "Sem Sinal", outra não), fazendo os % não fecharem. Agora ambas usam a mesma base (total de registros técnicos), com legenda indicando a base.
 - Confirmado: ausência de SMS nos dados é real (transmissão 100% UDP), não é falha.
+
+## v0.11
+- **Suporte ao arquivo único do Gerenciamento de Firmware:** um só CSV que contém tudo (posição, raio, estimada, endereço, rede/banda, bateria, latência, buffer). Detecção automática de formato — convive com o formato antigo de 3 arquivos (CSV+XLS+KML). Elimina a dependência do portal SSO.
+  - Robustez a campos que variam por modelo/estado do GPS: usa "estimada" como base e infere a validade do GPS quando a coluna "gps" vem vazia (caso do RI720).
+- **Buffer/LIFO na latência:** o cálculo de latência em tempo real agora exclui os registros recuperados do buffer (que sobem atrasados após perda de sinal e, por serem LIFO, têm data de servidor fora de ordem). Os bufferizados são contabilizados à parte e destacados na série temporal. Ex.: média real caiu de 24s (misturada) para 3,5s (só tempo real).
