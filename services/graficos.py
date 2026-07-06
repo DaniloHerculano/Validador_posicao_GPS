@@ -668,39 +668,80 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
     with st.expander(titulo, expanded=expandir):
         if "_latencia_s" not in df_raw.columns or df_raw["_latencia_s"].isna().all():
             st.info("📄 Latência (módulo→servidor) vem do **CSV** (log técnico). Suba o CSV deste equipamento."); return
-        dfl = df_raw.dropna(subset=["_latencia_s"])
+        dfl = df_raw.dropna(subset=["_latencia_s"]).copy()
         if len(dfl) == 0:
             st.info("Nenhum registro com latência válida."); return
-        media = dfl["_latencia_s"].mean(); mx = dfl["_latencia_s"].max()
-        pok = (dfl["_latencia_s"] <= 90).mean() * 100
-        psms = 0
-        if "transmissiontype" in df_raw.columns:
-            psms = (df_raw["transmissiontype"].astype(str).str.upper() == "SMS").mean() * 100
+
+        # Identifica pontos bufferizados (subiram atrasados após perda de sinal).
+        # O buffer é LIFO: ao retornar o sinal, os mais novos sobem antes, então
+        # esses registros têm latência alta e não representam o tempo real de envio.
+        if "_buffer_bool" in dfl.columns:
+            buf_mask = dfl["_buffer_bool"].fillna(False)
+        elif "bufferstatus" in dfl.columns:
+            buf_mask = dfl["bufferstatus"].astype(str).str.lower().isin(["t", "true", "1"])
+        else:
+            buf_mask = pd.Series(False, index=dfl.index)
+
+        dfl_real = dfl[~buf_mask]      # transmissão em tempo real
+        dfl_buf = dfl[buf_mask]        # recuperados do buffer
+        base_real = dfl_real if len(dfl_real) > 0 else dfl
+
+        media = base_real["_latencia_s"].mean()
+        mx = base_real["_latencia_s"].max()
+        pok = (base_real["_latencia_s"] <= 90).mean() * 100
+        st.caption("A latência em tempo real considera apenas registros **não** "
+                   "bufferizados. Os pontos recuperados do buffer (atraso por perda de "
+                   "sinal) são contabilizados à parte.")
         grid(
-            tile("Latência Média", f"{media:.1f}s", cc="green" if media < 90 else "amber"),
-            tile("Latência Máx", f"{mx:.0f}s"),
-            tile("% ≤90s", f"{pok:.1f}%", cc="green"),
-            tile("% SMS", f"{psms:.1f}%", cc="blue"),
+            tile("Latência Média (tempo real)", f"{media:.1f}s",
+                 cc="green" if media < 90 else "amber"),
+            tile("Latência Máx (tempo real)", f"{mx:.0f}s"),
+            tile("% ≤90s (tempo real)", f"{pok:.1f}%", cc="green"),
+            tile("Registros bufferizados", f"{len(dfl_buf):,}",
+                 f"{len(dfl_buf)/len(dfl)*100:.1f}% do total",
+                 cc="amber" if len(dfl_buf) else ""),
         )
-        dfl = dfl.copy()
-        dfl["_cat"] = pd.cut(dfl["_latencia_s"], bins=LATENCIA_BINS, labels=LATENCIA_LABELS)
-        cc = dfl["_cat"].value_counts().reindex(LATENCIA_LABELS).fillna(0)
+        if len(dfl_buf) > 0:
+            st.markdown(f"**Buffer (recuperação de sinal):** {len(dfl_buf)} registros "
+                        f"subiram atrasados, com latência de "
+                        f"{dfl_buf['_latencia_s'].min():.0f}s a "
+                        f"{dfl_buf['_latencia_s'].max():.0f}s "
+                        f"(média {dfl_buf['_latencia_s'].mean():.0f}s). "
+                        f"São normais após perda de sinal e não indicam falha de envio "
+                        f"em tempo real.")
+
+        dfl_real2 = base_real.copy()
+        dfl_real2["_cat"] = pd.cut(dfl_real2["_latencia_s"], bins=LATENCIA_BINS,
+                                   labels=LATENCIA_LABELS)
+        cc = dfl_real2["_cat"].value_counts().reindex(LATENCIA_LABELS).fillna(0)
         c1, c2 = st.columns(2)
         with c1:
             fig = go.Figure(go.Bar(x=cc.index, y=cc.values, marker_color=LATENCIA_CORES,
                 text=cc.values.astype(int), textposition="outside"))
-            fig.update_layout(title="Distribuição de Latência por Faixa", showlegend=False)
+            fig.update_layout(title="Latência em Tempo Real por Faixa (sem buffer)",
+                              showlegend=False)
             st.plotly_chart(aplica_tema(fig), width='stretch', key=f"lat_{kid}")
         with c2:
-            if "bufferstatus" in df_raw.columns and df_raw["bufferstatus"].notna().any():
-                buf = df_raw["bufferstatus"].astype(str).value_counts()
-                lbls = ["Buffer (atrasado)" if v in ("t", "true", "1") else "Tempo real" for v in buf.index]
-                fig = go.Figure(go.Pie(labels=lbls, values=buf.values, hole=0.55,
-                    marker=dict(colors=[SR_RED, "#2477b3"])))
-                fig.update_layout(title="Buffer Status")
+            # Série temporal marcando os pontos bufferizados
+            if "datetime_module" in dfl.columns:
+                ts = dfl.sort_values("datetime_module")
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=ts[~buf_mask.reindex(ts.index).fillna(False)]["datetime_module"],
+                    y=ts[~buf_mask.reindex(ts.index).fillna(False)]["_latencia_s"],
+                    mode="markers", name="Tempo real",
+                    marker=dict(size=5, color="#2477b3")))
+                if len(dfl_buf) > 0:
+                    tsb = ts[buf_mask.reindex(ts.index).fillna(False)]
+                    fig.add_trace(go.Scatter(
+                        x=tsb["datetime_module"], y=tsb["_latencia_s"],
+                        mode="markers", name="Buffer (atrasado)",
+                        marker=dict(size=8, color=SR_RED, symbol="triangle-up")))
+                fig.update_layout(title="Latência ao Longo do Tempo (buffer destacado)",
+                                  yaxis_title="segundos")
                 st.plotly_chart(aplica_tema(fig), width='stretch', key=f"buf_{kid}")
             else:
-                st.info("Campo bufferstatus não disponível.")
+                st.info("Sem horário para série temporal de latência.")
 
 
 def aba_latencia(df_ref, ref_nome, comparacao, dados):
