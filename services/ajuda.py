@@ -43,8 +43,18 @@ posição caiu **dentro do raio de incerteza que o próprio sistema** informa.
     # ── Os três relatórios ──
     st.markdown("#### 📑 Os relatórios de cada rastreador")
     st.markdown("""
-Cada equipamento gera relatórios que se complementam. Você pode subir os três
-(análise completa) ou apenas os que tiver — o app usa o que estiver disponível.
+Há **duas formas** de fornecer os dados de cada rastreador:
+
+**① Arquivo único (recomendado)** — um único CSV do portal de **Gerenciamento de
+Firmware** que já traz *tudo*: posição, raio de incerteza, indicador de posição
+estimada, endereço, rede/banda, bateria, latência e status de buffer. Basta subir
+esse CSV — não precisa de XLS nem KML, nem do portal SSO.
+
+**② Três arquivos separados (formato antigo)** — CSV (log técnico) + XLS (posição) +
+KML (raio), como descrito abaixo. Continua funcionando normalmente.
+
+O app **detecta automaticamente** qual formato você enviou. Abaixo, o detalhe do
+formato de três arquivos:
 """)
 
     c1, c2, c3 = st.columns(3)
