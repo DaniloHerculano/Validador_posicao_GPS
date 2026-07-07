@@ -46,7 +46,7 @@ with st.sidebar:
     raio3 = st.number_input("Raio 3 (km)", value=5.0, step=0.5, min_value=0.1)
     st.markdown("---")
     botao_sair()
-    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.11.1</span>',
+    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.11.2</span>',
                 unsafe_allow_html=True)
 
 # ── AJUDA RÁPIDA ──────────────────────────────────────────────────────────────
@@ -253,7 +253,7 @@ else:
         "📶 Rede & Operadora", "🛰 Qualidade GPS", "🚗 Movimento", "🔋 Bateria", "⏱ Latência",
         "📋 Dados & Export", "💾 Histórico", "❓ Como Usar"])
 
-    with abas[0]: g.aba_visao_geral(resultados, df_ref, ref_nome, raios)
+    with abas[0]: g.aba_visao_geral(resultados, df_ref, ref_nome, raios, dados)
     with abas[1]: g.aba_mapa(resultados, df_ref, ref_nome)
     with abas[2]: g.aba_precisao(resultados, raios)
     with abas[3]: g.aba_raio_sistema(resultados)
