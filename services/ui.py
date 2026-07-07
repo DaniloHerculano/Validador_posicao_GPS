@@ -26,6 +26,13 @@ def sec(txt: str):
     st.markdown(f'<div class="sec-hdr">// {txt}</div>', unsafe_allow_html=True)
 
 
+def explicacao(texto: str):
+    """Caixa informativa breve no topo de uma aba, explicando o que é analisado."""
+    st.markdown(
+        f'<div class="aba-help">ℹ️ {texto}</div>',
+        unsafe_allow_html=True)
+
+
 def aplica_tema(fig, h=300):
     fig.update_layout(**PLOTLY_THEME, height=h)
     return fig
@@ -90,6 +97,8 @@ h1,h2,h3,h4{font-family:'Barlow Condensed',sans-serif!important;font-weight:700!
 .sec-hdr{font-family:'Barlow Condensed',sans-serif;font-size:.72rem;font-weight:700;color:var(--red);
   text-transform:uppercase;letter-spacing:.16em;border-bottom:2px solid var(--border);
   padding-bottom:.45rem;margin:1.8rem 0 1.1rem 0;}
+.aba-help{background:#eef4fb;border-left:3px solid #2477b3;border-radius:6px;
+  padding:.7rem .9rem;font-size:.85rem;color:#33475b;line-height:1.5;margin-bottom:1rem;}
 
 /* HERO — corrigido: line-height e padding para não cortar */
 .hero-wrap{display:flex;align-items:center;gap:1rem;margin:.2rem 0 .6rem 0;}
