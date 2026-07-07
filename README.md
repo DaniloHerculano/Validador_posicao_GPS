@@ -144,3 +144,6 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
 ## v0.11.2
 - **Visão Geral reformulada** para ser um painel de entrada de verdade: KPIs do teste no topo (equipamentos, tipos, registros, erro global), tabela de equipamentos, resumo de precisão e uma seção **"Destaques por Área"** com rede predominante, operadora, banda, bateria (início→fim), latência real e buffer de cada peça. Funciona nos modos comparativo e individual.
 - Descrição da ferramenta reescrita para refletir todo o escopo (posição, rede, GPS, bateria, movimento, latência/buffer, modos, histórico, export) — não apenas a comparação de posição.
+
+## v0.11.3
+- Modo **Individual** ganhou as abas **Visão Geral** (panorama dos equipamentos + destaques por área) e **Mapa** (plota as posições registradas de cada peça, distinguindo GPS real de estimada, sem comparação).
