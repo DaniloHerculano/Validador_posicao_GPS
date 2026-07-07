@@ -135,3 +135,8 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
 - **Suporte ao arquivo único do Gerenciamento de Firmware:** um só CSV que contém tudo (posição, raio, estimada, endereço, rede/banda, bateria, latência, buffer). Detecção automática de formato — convive com o formato antigo de 3 arquivos (CSV+XLS+KML). Elimina a dependência do portal SSO.
   - Robustez a campos que variam por modelo/estado do GPS: usa "estimada" como base e infere a validade do GPS quando a coluna "gps" vem vazia (caso do RI720).
 - **Buffer/LIFO na latência:** o cálculo de latência em tempo real agora exclui os registros recuperados do buffer (que sobem atrasados após perda de sinal e, por serem LIFO, têm data de servidor fora de ordem). Os bufferizados são contabilizados à parte e destacados na série temporal. Ex.: média real caiu de 24s (misturada) para 3,5s (só tempo real).
+
+## v0.11.1
+- "Como Usar" reescrito com a lógica correta das fontes: o **CSV do firmware sozinho já traz tudo** (recomendado); **XLS+KML do SSO** é alternativa parcial (sem rede/latência). Removida a informação desatualizada de que "o CSV não traz coordenada".
+- Cada aba agora exibe uma **breve explicação** no topo (o que é analisado, como e de onde vêm os dados).
+- Passo a passo e nomenclatura de arquivos atualizados para o novo fluxo (arquivo único primeiro).
