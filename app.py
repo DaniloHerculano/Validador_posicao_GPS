@@ -46,7 +46,7 @@ with st.sidebar:
     raio3 = st.number_input("Raio 3 (km)", value=5.0, step=0.5, min_value=0.1)
     st.markdown("---")
     botao_sair()
-    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.11</span>',
+    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.11.1</span>',
                 unsafe_allow_html=True)
 
 # ── AJUDA RÁPIDA ──────────────────────────────────────────────────────────────
