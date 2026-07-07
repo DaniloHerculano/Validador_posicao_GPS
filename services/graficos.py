@@ -10,7 +10,7 @@ from services.config import (
     SR_RED, SR_RED2, SR_SLATE, SR_LIGHT, COLORS_TECH, COLORS_RAIOS, PALETA,
     LATENCIA_BINS, LATENCIA_LABELS, LATENCIA_CORES,
 )
-from services.ui import tile, grid, sec, aplica_tema
+from services.ui import tile, grid, sec, aplica_tema, explicacao
 import streamlit as st
 
 
@@ -18,6 +18,7 @@ import streamlit as st
 # VISÃO GERAL
 # ══════════════════════════════════════════════════════════════════════════════
 def aba_visao_geral(resultados, df_ref, ref_nome, raios):
+    explicacao("Esta aba resume a comparação: para cada amostra, o **erro médio** de posição (distância entre a estimativa e a referência real) e o **% de pontos** dentro dos raios de precisão configurados. É o panorama geral da qualidade do posicionamento.")
     raio1, raio2, raio3 = raios
     sec("Resumo Comparativo")
 
@@ -102,6 +103,7 @@ def _circulo_geo(lat, lon, raio_km, n=40):
 
 
 def aba_mapa(resultados, df_ref, ref_nome):
+    explicacao("Mostra no mapa a **rota real** (referência, em azul) e as **posições estimadas** de cada amostra, ligadas por linhas que representam o erro. Dá para exibir o **círculo do raio de incerteza** do sistema e destacar pontos fora dele.")
     sec("Mapa Comparativo de Posições")
     st.caption("Referência (GPS Real) + amostras testadas · "
                "linhas = erro entre pontos sincronizados · passe o mouse para ver erro, posição e horário")
@@ -307,6 +309,7 @@ def aba_mapa(resultados, df_ref, ref_nome):
 # PRECISÃO GPS
 # ══════════════════════════════════════════════════════════════════════════════
 def aba_precisao(resultados, raios):
+    explicacao("Detalha o **erro de posição** de cada amostra em km: média, mediana, máximo e o % dentro de cada raio. Para equipamentos mistos, separa o erro dos pontos **GPS real** dos **estimados**. O erro é a distância geodésica (WGS-84) até a referência no horário mais próximo.")
     raio1, raio2, raio3 = raios
     for ci, (nome, df) in enumerate(resultados.items()):
         d = df["distancia_km"].dropna() if len(df) and "distancia_km" in df.columns else df.head(0)
@@ -473,6 +476,7 @@ def _dtec(item):
 
 
 def aba_rede(resultados, df_ref, ref_nome, comparacao, dados):
+    explicacao("Analisa **como o rastreador se comunica**: tecnologia (2G/3G/4G), operadora e a **banda/frequência** do modem (GSM850/900/1800/1900, LTE B3/B7/B28...). Útil para avaliar o desempenho do modem. Vem do CSV técnico completo.")
     # Modo individual: sem referência, analisa cada peça de "dados"
     if df_ref is None or len(df_ref) == 0:
         for ci, item in enumerate(dados):
@@ -533,6 +537,7 @@ def _gps_um(df_raw, titulo, kid="x", expandir=False):
 
 
 def aba_qualidade_gps(df_ref, ref_nome, comparacao, dados):
+    explicacao("Mostra a **qualidade do sinal de GPS**: número de satélites e os índices de diluição de precisão (HDOP/VDOP). Só há dados quando o **GPS está ligado** (rastreador de referência ou peça com GPS ativo).")
     # Modo individual: sem referência, analisa cada peça de "dados"
     if df_ref is None or len(df_ref) == 0:
         for ci, item in enumerate(dados):
@@ -604,6 +609,7 @@ def _mov_um(df_raw, titulo, kid="x", expandir=False):
 
 
 def aba_movimento(df_ref, ref_nome, comparacao, dados):
+    explicacao("Analisa **velocidade e direção** ao longo do tempo, e o sensor de movimento. Ajuda a entender se o veículo estava parado ou em deslocamento — o que também influencia o erro de posição estimada.")
     # Modo individual: sem referência, analisa cada peça de "dados"
     if df_ref is None or len(df_ref) == 0:
         for ci, item in enumerate(dados):
@@ -649,6 +655,7 @@ def _bat_um(df_raw, titulo, kid="x", expandir=False):
 
 
 def aba_bateria(df_ref, ref_nome, comparacao, dados):
+    explicacao("Acompanha o **nível de bateria** (%) ao longo do teste, ajudando a avaliar o consumo do equipamento durante a viagem.")
     # Modo individual: sem referência, analisa cada peça de "dados"
     if df_ref is None or len(df_ref) == 0:
         for ci, item in enumerate(dados):
@@ -745,6 +752,7 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
 
 
 def aba_latencia(df_ref, ref_nome, comparacao, dados):
+    explicacao("Mede o **tempo entre o registro no módulo e a chegada ao servidor** (latência). Separa a transmissão **em tempo real** dos registros **recuperados do buffer** — que sobem atrasados após perda de sinal e, por serem LIFO, não representam a velocidade real de envio.")
     # Modo individual: sem referência, analisa cada peça de "dados"
     if df_ref is None or len(df_ref) == 0:
         for ci, item in enumerate(dados):
@@ -760,6 +768,7 @@ def aba_latencia(df_ref, ref_nome, comparacao, dados):
 
 # ══════════════════════════════════════════════════════════════════════════════
 def aba_raio_sistema(resultados):
+    explicacao("Valida o **próprio sistema PST**: compara a distância medida com o **raio de incerteza** que o sistema informou para cada posição estimada, indicando o **% de vezes** em que a posição real caiu dentro do raio prometido.")
     """Valida a distância medida contra o raio de incerteza do próprio sistema (KML)."""
     from services.analise import resumo_raio
     sec("Validação contra o Raio do Sistema (KML)")
