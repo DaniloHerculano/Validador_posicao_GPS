@@ -140,3 +140,7 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
 - "Como Usar" reescrito com a lógica correta das fontes: o **CSV do firmware sozinho já traz tudo** (recomendado); **XLS+KML do SSO** é alternativa parcial (sem rede/latência). Removida a informação desatualizada de que "o CSV não traz coordenada".
 - Cada aba agora exibe uma **breve explicação** no topo (o que é analisado, como e de onde vêm os dados).
 - Passo a passo e nomenclatura de arquivos atualizados para o novo fluxo (arquivo único primeiro).
+
+## v0.11.2
+- **Visão Geral reformulada** para ser um painel de entrada de verdade: KPIs do teste no topo (equipamentos, tipos, registros, erro global), tabela de equipamentos, resumo de precisão e uma seção **"Destaques por Área"** com rede predominante, operadora, banda, bateria (início→fim), latência real e buffer de cada peça. Funciona nos modos comparativo e individual.
+- Descrição da ferramenta reescrita para refletir todo o escopo (posição, rede, GPS, bateria, movimento, latência/buffer, modos, histórico, export) — não apenas a comparação de posição.
