@@ -46,7 +46,7 @@ with st.sidebar:
     raio3 = st.number_input("Raio 3 (km)", value=5.0, step=0.5, min_value=0.1)
     st.markdown("---")
     botao_sair()
-    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.11.2</span>',
+    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.11.3</span>',
                 unsafe_allow_html=True)
 
 # ── AJUDA RÁPIDA ──────────────────────────────────────────────────────────────
@@ -224,20 +224,22 @@ if vazios:
 
 # ── ABAS ──────────────────────────────────────────────────────────────────────
 if eh_individual:
-    # Modo individual: só as análises que fazem sentido por peça (sem comparação)
-    abas = st.tabs(["📶 Rede & Operadora", "🛰 Qualidade GPS", "🚗 Movimento",
-        "🔋 Bateria", "⏱ Latência", "📋 Dados", "💾 Histórico", "❓ Como Usar"])
+    # Modo individual: análises por peça + visão geral e mapa (sem comparação)
+    abas = st.tabs(["📊 Visão Geral", "🗺 Mapa", "📶 Rede & Operadora", "🛰 Qualidade GPS",
+        "🚗 Movimento", "🔋 Bateria", "⏱ Latência", "📋 Dados", "💾 Histórico", "❓ Como Usar"])
     vazio_df = pd.DataFrame()
-    with abas[0]: g.aba_rede({}, vazio_df, "", [], dados)
-    with abas[1]: g.aba_qualidade_gps(vazio_df, "", [], dados)
-    with abas[2]: g.aba_movimento(vazio_df, "", [], dados)
-    with abas[3]: g.aba_bateria(vazio_df, "", [], dados)
-    with abas[4]: g.aba_latencia(vazio_df, "", [], dados)
-    with abas[7]: render_ajuda()
-    with abas[6]:
+    with abas[0]: g.aba_visao_geral({}, vazio_df, "", raios, dados)
+    with abas[1]: g.aba_mapa_individual(dados)
+    with abas[2]: g.aba_rede({}, vazio_df, "", [], dados)
+    with abas[3]: g.aba_qualidade_gps(vazio_df, "", [], dados)
+    with abas[4]: g.aba_movimento(vazio_df, "", [], dados)
+    with abas[5]: g.aba_bateria(vazio_df, "", [], dados)
+    with abas[6]: g.aba_latencia(vazio_df, "", [], dados)
+    with abas[9]: render_ajuda()
+    with abas[8]:
         sec("Histórico de Relatórios")
         st.caption("O seletor de histórico está no topo da página (seção Importar Arquivos).")
-    with abas[5]:
+    with abas[7]:
         sec("Dados por Equipamento")
         sel = st.selectbox("Equipamento", [d["arquivo"] for d in dados], key="sel_ind")
         item = next(d for d in dados if d["arquivo"] == sel)
