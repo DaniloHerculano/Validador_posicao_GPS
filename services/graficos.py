@@ -11,6 +11,11 @@ from services.config import (
     LATENCIA_BINS, LATENCIA_LABELS, LATENCIA_CORES,
 )
 from services.ui import tile, grid, sec, aplica_tema, explicacao
+
+
+def _dtec(item):
+    """Retorna o dataframe técnico completo (CSV) do equipamento, se houver."""
+    return item.get("df_tecnico", item["df"]) if item else None
 import streamlit as st
 
 
@@ -204,6 +209,81 @@ def _circulo_geo(lat, lon, raio_km, n=40):
         pts_lat.append(lat + dlat * math.sin(ang))
         pts_lon.append(lon + dlon * math.cos(ang))
     return pts_lat, pts_lon
+
+
+def aba_mapa_individual(dados):
+    explicacao("Plota no mapa as **posições registradas** de cada equipamento. Pontos com "
+               "**GPS real** aparecem em verde e **posições estimadas** na cor do "
+               "equipamento. Sem comparação — apenas a visualização das posições.")
+    sec("Mapa de Posições")
+
+    # Quais equipamentos têm coordenadas
+    com_pos = [d for d in dados
+               if _dtec(d) is not None and {"latitude", "longitude"}.issubset(_dtec(d).columns)
+               and _dtec(d)[["latitude", "longitude"]].dropna().shape[0] > 0]
+    if not com_pos:
+        st.info("Nenhum equipamento com coordenadas (latitude/longitude) para exibir no mapa.")
+        return
+
+    nomes = [d["arquivo"] for d in com_pos]
+    sel = st.multiselect("Equipamentos a exibir", nomes, default=nomes, key="map_ind_sel")
+    fmt = st.selectbox("Formato dos marcadores",
+                       ["circle", "marker", "square", "diamond", "triangle"],
+                       format_func=lambda s: {"circle": "● Círculo", "marker": "📍 Pino",
+                       "square": "■ Quadrado", "diamond": "◆ Losango",
+                       "triangle": "▲ Triângulo"}.get(s, s), key="map_ind_fmt")
+
+    fig = go.Figure()
+    todas_lat, todas_lon = [], []
+    for i, d in enumerate(com_pos):
+        if d["arquivo"] not in sel:
+            continue
+        df = _dtec(d).dropna(subset=["latitude", "longitude"]).copy()
+        if len(df) == 0:
+            continue
+        cor = PALETA[i % len(PALETA)]
+        todas_lat += df["latitude"].tolist()
+        todas_lon += df["longitude"].tolist()
+        # Distinguir estimada × real quando houver a marcação
+        if "_estimada_bool" in df.columns and df["_estimada_bool"].notna().any():
+            est = df[df["_estimada_bool"] == True]
+            real = df[df["_estimada_bool"] == False]
+            if len(real):
+                fig.add_trace(go.Scattermap(
+                    lat=real["latitude"], lon=real["longitude"], mode="markers",
+                    marker=dict(size=9, color="#1f8b4c", symbol="circle"),
+                    name=f"{d['arquivo']} · GPS real",
+                    hovertemplate="<b>" + d["arquivo"] + "</b> · GPS Real<br>"
+                                  "%{lat:.5f}, %{lon:.5f}<extra></extra>"))
+            if len(est):
+                fig.add_trace(go.Scattermap(
+                    lat=est["latitude"], lon=est["longitude"], mode="markers",
+                    marker=dict(size=10, color=cor, symbol=fmt),
+                    name=f"{d['arquivo']} · estimada",
+                    hovertemplate="<b>" + d["arquivo"] + "</b> · Estimada<br>"
+                                  "%{lat:.5f}, %{lon:.5f}<extra></extra>"))
+        else:
+            fig.add_trace(go.Scattermap(
+                lat=df["latitude"], lon=df["longitude"], mode="markers",
+                marker=dict(size=10, color=cor, symbol=fmt),
+                name=d["arquivo"],
+                hovertemplate="<b>" + d["arquivo"] + "</b><br>"
+                              "%{lat:.5f}, %{lon:.5f}<extra></extra>"))
+
+    if not todas_lat:
+        st.info("Selecione ao menos um equipamento com coordenadas.")
+        return
+    clat = sum(todas_lat) / len(todas_lat)
+    clon = sum(todas_lon) / len(todas_lon)
+    fig.update_layout(
+        map=dict(style="carto-positron", center=dict(lat=clat, lon=clon), zoom=11),
+        margin=dict(l=0, r=0, t=48, b=0), height=580, paper_bgcolor="#ffffff",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
+                    bgcolor="rgba(255,255,255,.9)", bordercolor="#dce4ee", borderwidth=1,
+                    font=dict(color="#1f2a36", size=11)),
+        font=dict(family="Barlow, sans-serif", color="#1f2a36"))
+    st.plotly_chart(fig, width='stretch', key="mapa_individual",
+                    config={"modeBarButtonsToRemove": ["lasso2d", "select2d"]})
 
 
 def aba_mapa(resultados, df_ref, ref_nome):
@@ -572,11 +652,6 @@ def _rede_um(df_raw, titulo, df_prec=None, kid="x", expandir=False):
                     title="Erro de Posição × Tecnologia de Rede", color="_tech_comp",
                     color_discrete_sequence=COLORS_TECH)
                 st.plotly_chart(aplica_tema(fig), width='stretch', key=f"box_{kid}")
-
-
-def _dtec(item):
-    """Retorna o dataframe técnico completo (CSV) do equipamento, se houver."""
-    return item.get("df_tecnico", item["df"]) if item else None
 
 
 def aba_rede(resultados, df_ref, ref_nome, comparacao, dados):
