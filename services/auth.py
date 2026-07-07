@@ -11,7 +11,7 @@ _USUARIO = "validapst"
 _SENHA = "123456"
 
 # Versão corrente do sistema (exibida na tela de login)
-VERSAO = "0.11.1"
+VERSAO = "0.11.2"
 
 
 def _logo_b64() -> str:
@@ -90,6 +90,6 @@ def exigir_login():
 
 def botao_sair():
     """Botão de logout para colocar na sidebar."""
-    if st.button("🚪  Sair", key="logout", use_container_width=True):
+    if st.button("🚪  Sair", key="logout", width='stretch'):
         st.session_state["autenticado"] = False
         st.rerun()
