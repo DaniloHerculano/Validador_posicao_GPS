@@ -17,11 +17,67 @@ import streamlit as st
 # ══════════════════════════════════════════════════════════════════════════════
 # VISÃO GERAL
 # ══════════════════════════════════════════════════════════════════════════════
-def aba_visao_geral(resultados, df_ref, ref_nome, raios):
-    explicacao("Esta aba resume a comparação: para cada amostra, o **erro médio** de posição (distância entre a estimativa e a referência real) e o **% de pontos** dentro dos raios de precisão configurados. É o panorama geral da qualidade do posicionamento.")
+def aba_visao_geral(resultados, df_ref, ref_nome, raios, dados=None):
+    explicacao("Painel geral do teste: um panorama de **todos os equipamentos** e um "
+               "resumo de cada área analisada — precisão de posição, rede, bateria e "
+               "latência. Use as demais abas para o detalhe de cada tema.")
     raio1, raio2, raio3 = raios
-    sec("Resumo Comparativo")
+    dados = dados or []
+    eh_individual = (df_ref is None or len(df_ref) == 0)
 
+    def _dtec(item):
+        return item.get("df_tecnico", item.get("df")) if item else None
+
+    # ───────────────────────── KPIs do teste ─────────────────────────
+    sec("Panorama do Teste")
+    n_equip = len(dados) if dados else (len(resultados) + (0 if eh_individual else 1))
+    tipos = [d.get("tipo", "—") for d in dados] if dados else []
+    n_est = sum(1 for t in tipos if "Estimada" in t)
+    n_real = sum(1 for t in tipos if t == "GPS Real")
+    n_misto = sum(1 for t in tipos if "Misto" in t)
+    total_reg = sum(d.get("registros", 0) for d in dados) if dados else 0
+
+    # Erro global (média ponderada das amostras comparadas)
+    erros = pd.concat([df["distancia_km"].dropna() for df in resultados.values()
+                       if len(df)], ignore_index=True) if resultados else pd.Series(dtype=float)
+    erro_medio_global = erros.mean() if len(erros) else None
+
+    if eh_individual:
+        grid(
+            tile("Equipamentos", f"{n_equip}", cc="blue"),
+            tile("Registros totais", f"{total_reg:,}"),
+            tile("Estimada / Real / Misto", f"{n_est} / {n_real} / {n_misto}"),
+            tile("Modo", "Individual", cc="amber"),
+        )
+    else:
+        grid(
+            tile("Equipamentos", f"{n_equip}", cc="blue"),
+            tile("Amostras comparadas", f"{len(resultados)}"),
+            tile("Registros totais", f"{total_reg:,}"),
+            tile("Erro médio global",
+                 f"{erro_medio_global:.3f} km" if erro_medio_global is not None else "N/A",
+                 cc="green" if (erro_medio_global or 9) < raio2 else "amber"),
+        )
+
+    # ───────────────────────── Tabela de equipamentos ─────────────────────────
+    sec("Equipamentos do Teste")
+    if dados:
+        linhas_eq = []
+        for d in dados:
+            linhas_eq.append({
+                "Modelo": d.get("modelo", "—"), "PIN": d.get("pin", "—"),
+                "Arquivo": d.get("arquivo", "—"), "Tipo": d.get("tipo", "—"),
+                "Fonte": d.get("fonte", "—"), "Registros": d.get("registros", 0),
+            })
+        st.dataframe(pd.DataFrame(linhas_eq), width='stretch', hide_index=True)
+
+    # No modo individual, o painel para por aqui (sem comparação de posição)
+    if eh_individual:
+        _destaques_areas(dados, _dtec)
+        return
+
+    # ───────────────────────── Resumo de precisão ─────────────────────────
+    sec("Precisão de Posição (amostras estimadas)")
     linhas = []
     for nome, df in resultados.items():
         if len(df) == 0:
@@ -36,7 +92,6 @@ def aba_visao_geral(resultados, df_ref, ref_nome, raios):
             f"% ≤{raio3:.1f}km": round((d <= raio3).mean() * 100, 1),
             "Erro Médio (km)": round(d.mean(), 3),
             "Erro Máx (km)": round(d.max(), 3),
-            "Erro Mín (km)": round(d.min(), 3),
             "Mediana (km)": round(d.median(), 3),
         }
         if "dentro_raio" in df.columns:
@@ -49,7 +104,6 @@ def aba_visao_geral(resultados, df_ref, ref_nome, raios):
     if df_resumo is not None:
         st.dataframe(df_resumo, width='stretch', hide_index=True)
         st.session_state["df_resumo"] = df_resumo
-
         c1, c2 = st.columns(2)
         with c1:
             fig = go.Figure()
@@ -70,6 +124,7 @@ def aba_visao_geral(resultados, df_ref, ref_nome, raios):
             fig.update_layout(title="Erro Médio por Equipamento (km)", showlegend=False)
             st.plotly_chart(aplica_tema(fig, 340), width='stretch', key="vg_erro")
 
+    # Referência
     sec(f"Referência — {ref_nome}")
     gps_ok = int(df_ref["_gps_bool"].sum()) if "_gps_bool" in df_ref.columns else 0
     gps_tot = len(df_ref)
@@ -83,6 +138,55 @@ def aba_visao_geral(resultados, df_ref, ref_nome, raios):
         tile("Total Sincronizado", f"{tot_sync:,}", f"{len(resultados)} equip."),
         tile("Bateria Ref.", f"{bat_i:.0f}%→{bat_f:.0f}%" if bat_i is not None else "N/A", cc="amber"),
     )
+
+    # ───────────────────────── Destaques de cada área ─────────────────────────
+    _destaques_areas(dados, _dtec)
+
+
+def _destaques_areas(dados, _dtec):
+    """Resumo de rede, bateria e latência/buffer de todos os equipamentos."""
+    if not dados:
+        return
+    sec("Destaques por Área")
+    st.caption("Resumo rápido de rede, bateria e latência de cada equipamento. "
+               "Veja o detalhe nas abas específicas.")
+
+    linhas = []
+    for d in dados:
+        dtec = _dtec(d)
+        if dtec is None or len(dtec) == 0:
+            continue
+        reg = {"Equipamento": d.get("arquivo", "—")}
+        # Rede: tecnologia predominante e banda predominante
+        if "_tech" in dtec.columns and dtec["_tech"].notna().any():
+            tech_top = dtec["_tech"].mode()
+            reg["Rede predom."] = tech_top.iloc[0] if len(tech_top) else "—"
+        if "_operadora" in dtec.columns and dtec["_operadora"].notna().any():
+            op_top = dtec["_operadora"].mode()
+            reg["Operadora"] = op_top.iloc[0] if len(op_top) else "—"
+        if "_banda" in dtec.columns and (dtec["_banda"] != "—").any():
+            b = dtec[dtec["_banda"] != "—"]["_banda"].mode()
+            reg["Banda predom."] = b.iloc[0] if len(b) else "—"
+        # Bateria: início → fim
+        bcol = "_bateria_pct" if "_bateria_pct" in dtec.columns else "_bateria_pct_csv"
+        if bcol in dtec.columns and dtec[bcol].notna().any():
+            bp = dtec[bcol].dropna()
+            reg["Bateria"] = f"{bp.iloc[0]:.0f}%→{bp.iloc[-1]:.0f}%"
+        # Latência em tempo real (exclui buffer) + nº bufferizado
+        if "_latencia_s" in dtec.columns and dtec["_latencia_s"].notna().any():
+            if "_buffer_bool" in dtec.columns:
+                bufm = dtec["_buffer_bool"].fillna(False)
+            else:
+                bufm = pd.Series(False, index=dtec.index)
+            lat_real = dtec[~bufm]["_latencia_s"].dropna()
+            reg["Latência real"] = f"{lat_real.mean():.1f}s" if len(lat_real) else "—"
+            reg["Buffer"] = f"{int(bufm.sum())} reg." if bufm.any() else "—"
+        linhas.append(reg)
+
+    if linhas:
+        st.dataframe(pd.DataFrame(linhas), width='stretch', hide_index=True)
+    else:
+        st.caption("Sem dados técnicos (rede/latência) disponíveis para resumir.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
