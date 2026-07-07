@@ -40,98 +40,91 @@ medindo o quão distante a estimativa ficou da referência real — e ainda vali
 posição caiu **dentro do raio de incerteza que o próprio sistema** informa.
 """)
 
-    # ── Os três relatórios ──
-    st.markdown("#### 📑 Os relatórios de cada rastreador")
+    # ── Os arquivos ──
+    st.markdown("#### 📑 De onde vêm os dados")
     st.markdown("""
-Há **duas formas** de fornecer os dados de cada rastreador:
-
-**① Arquivo único (recomendado)** — um único CSV do portal de **Gerenciamento de
-Firmware** que já traz *tudo*: posição, raio de incerteza, indicador de posição
-estimada, endereço, rede/banda, bateria, latência e status de buffer. Basta subir
-esse CSV — não precisa de XLS nem KML, nem do portal SSO.
-
-**② Três arquivos separados (formato antigo)** — CSV (log técnico) + XLS (posição) +
-KML (raio), como descrito abaixo. Continua funcionando normalmente.
-
-O app **detecta automaticamente** qual formato você enviou. Abaixo, o detalhe do
-formato de três arquivos:
+Há **duas maneiras** de fornecer os dados de cada rastreador. O app detecta
+automaticamente qual você enviou.
 """)
 
-    c1, c2, c3 = st.columns(3)
+    c1, c2 = st.columns(2)
     with c1:
         st.markdown("""
-<div class="help-card">
-<div class="help-card-tag">.CSV</div>
-<div class="help-card-title">Log Técnico</div>
-<p>Rede (2G/3G/4G), operadora, satélites, DOP, latência, transmissão (UDP/SMS)
-e bateria bruta.</p>
+<div class="help-card" style="border-color:#1f8b4c">
+<div class="help-card-tag" style="background:#1f8b4c">RECOMENDADO</div>
+<div class="help-card-title">① CSV do Gerenciamento de Firmware</div>
+<p>Um <b>único arquivo</b> que já traz <b>tudo</b>: posição (real e estimada), raio de
+incerteza, endereço, indicador de posição estimada, rede/operadora/banda, bateria,
+latência e status de buffer.</p>
+<p>Com ele, <b>não é preciso</b> o portal SSO nem os arquivos XLS/KML.</p>
 <p><b>Onde baixar:</b><br>
 <a href="http://websites01.positronrt.cloud/firmware/index.php?tipoparametro=diversosplanform" target="_blank">
-Portal de Firmware / Diversos</a></p>
+Portal de Firmware → Diversos → Planilhas de Testes</a></p>
 </div>
 """, unsafe_allow_html=True)
     with c2:
         st.markdown("""
 <div class="help-card">
-<div class="help-card-tag">.XLS</div>
-<div class="help-card-title">Relatório de Posição</div>
-<p>Latitude/longitude (real <b>ou</b> estimada), endereço ("Próximo a:"),
-posição estimada, validade do GPS e bateria em %.</p>
+<div class="help-card-tag">ALTERNATIVA</div>
+<div class="help-card-title">② XLS + KML do SSO</div>
+<p>Caso você tenha acesso apenas ao <b>portal SSO</b>, pode usar o <b>XLS</b> (posição,
+endereço, posição estimada, bateria) e o <b>KML</b> (raio de incerteza).</p>
+<p><b>Atenção:</b> essa via <b>não traz os dados de rede</b> (2G/3G/4G, operadora,
+banda), satélites nem latência — para isso é necessário o CSV. O XLS/KML cobrem
+posição e raio, mas não o desempenho de comunicação.</p>
 <p><b>Onde baixar:</b><br>
-<a href="https://sso.pst.com.br/sso/" target="_blank">Portal SSO / PST</a></p>
+<a href="https://sso.pst.com.br/sso/" target="_blank">Portal SSO / PST</a> (exportar XLS e KML)</p>
 </div>
 """, unsafe_allow_html=True)
-    with c3:
-        st.markdown("""
-<div class="help-card">
-<div class="help-card-tag">.KML</div>
-<div class="help-card-title">Raio do Sistema</div>
-<p>Além da posição, traz o <b>raio de incerteza</b> que o próprio sistema calcula
-para cada posição estimada. Usado para validar o sistema PST.</p>
-<p><b>Onde baixar:</b><br>
-<a href="https://sso.pst.com.br/sso/" target="_blank">Portal SSO / PST</a> (mesmo
-local do XLS, opção exportar KML)</p>
-</div>
-""", unsafe_allow_html=True)
+
+    st.markdown("""
+> **Em resumo:** o **CSV do firmware sozinho já basta** e é o caminho mais simples. O
+> **XLS + KML do SSO** é uma alternativa para quem só tem o SSO, mas cobre menos coisas
+> (sem rede, sem latência). Também é possível combinar os três arquivos antigos
+> (CSV+XLS+KML) — o app une tudo por horário.
+""")
 
     # ── Prints: onde extrair cada arquivo ──
-    st.markdown("#### 📸 Onde extrair cada arquivo (passo a passo)")
+    st.markdown("#### 📸 Onde extrair os arquivos (passo a passo)")
 
-    st.markdown("**CSV — [Portal de Firmware (Positron)]"
-                "(http://websites01.positronrt.cloud/firmware/index.php?tipoparametro=diversosplanform):** "
+    st.markdown("**① CSV — [Portal de Firmware (Positron)]"
+                "(http://websites01.positronrt.cloud/firmware/index.php?tipoparametro=diversosplanform)"
+                " — o arquivo que já traz tudo:** "
                 "acesse **Upload de arquivo → Diversos → Planilhas de Testes** (1, 2), "
                 "escolha o tipo de consulta **\"Consulta carga posições e status\"** (3), "
                 "informe o PIN e o período em UTC (4) e clique em **Consultar** (5).")
     _print_passo("config_websites01.png",
-                 "Portal de Firmware — geração da planilha CSV (Planilhas de Testes)",
+                 "Portal de Firmware — geração do CSV completo (Planilhas de Testes)",
                  estreito=True)
 
-    st.markdown("**XLS e KML — [Portal SSO/PST](https://sso.pst.com.br/sso/):** "
+    st.markdown("**② XLS e KML — [Portal SSO/PST](https://sso.pst.com.br/sso/) — "
+                "via alternativa (posição e raio, sem dados de rede):** "
                 "na busca (1), marque **Localização** e "
                 "**Posições estimadas** (2, 3), defina data/hora inicial e final e clique "
                 "em **Consultar** (4).")
     _print_passo("config_sso.png",
                  "Portal SSO/PST — filtro de consulta (Localização + Posições estimadas)")
 
-    st.markdown("Na aba **Resultado**, use **Exportar XLS** (1) para o relatório de posição "
-                "e **Exportar KML** (2) para obter o arquivo com o raio do sistema.")
+    st.markdown("Na aba **Resultado**, use **Exportar XLS** (1) para a posição "
+                "e **Exportar KML** (2) para o raio de incerteza.")
     _print_passo("download_xls_kml_sso.png",
                  "Portal SSO/PST — exportação do XLS e do KML")
 
-    # ── Por que dois ──
-    st.markdown("#### 🔗 Por que vários relatórios?")
+    # ── Como o app combina as fontes ──
+    st.markdown("#### 🔗 Como o app usa cada fonte")
     st.markdown("""
-O **CSV** sabe *como* o equipamento está se comunicando (rede, sinal, bateria), mas
-quando o GPS está desligado ele **não traz a coordenada pronta** — só o código da
-torre de celular usada.
+**Se você usa o CSV do firmware:** ele já contém tudo, então o app lê um arquivo só e
+pronto — posição, raio, rede, bateria, latência e buffer saem todos dele.
 
-O **XLS** é gerado por um sistema que converte essa torre em latitude/longitude
-(a posição estimada com o endereço "Próximo a:"). É a fonte confiável de **onde** o
-equipamento está.
+**Se você usa o XLS + KML do SSO:** o app pega a posição e o endereço do **XLS** e o
+raio de incerteza do **KML**. Nesse caso, as abas que dependem de dados de comunicação
+(Rede, Latência) ficam vazias, porque o SSO não fornece essas informações — elas só
+existem no CSV.
 
-Por isso o app **une as fontes por horário**: usa a posição e a bateria do XLS,
-enriquece cada ponto com os dados técnicos do CSV, e associa o raio de incerteza
-do KML — tudo pelo horário mais próximo.
+**Se você combina os três arquivos antigos (CSV+XLS+KML):** o app une tudo pelo
+horário mais próximo — posição e bateria do XLS, dados técnicos do CSV, raio do KML.
+
+Em qualquer caso, o app mostra o que for possível com o que você forneceu.
 """)
 
     # ── O KML e o raio ──
@@ -153,33 +146,33 @@ próprio sistema. É uma forma de validar o sistema de geolocalização atual.
     # ── Exemplo de nomes ──
     st.markdown("#### 📁 Como nomear os arquivos")
     st.markdown("""
-Os arquivos de um mesmo rastreador devem ter o **mesmo nome**, mudando apenas a
-**extensão**. Assim o app agrupa as fontes automaticamente. Exemplo para um
-equipamento:
+**Usando o CSV do firmware:** basta um arquivo por rastreador. O nome é livre, mas
+ajuda identificar o equipamento — ex.: `RI720_623639301_com_fallback.csv`.
+
+**Usando XLS + KML (ou os três arquivos):** os arquivos do **mesmo** rastreador devem
+ter o **mesmo nome**, mudando só a extensão, para o app agrupá-los. Exemplo:
 """)
     st.code(
-        "RI130_623721833_GNSS_1_29_05-01_06.csv   ← log técnico\n"
-        "RI130_623721833_GNSS_1_29_05-01_06.xls   ← posição\n"
-        "RI130_623721833_GNSS_1_29_05-01_06.kml   ← raio do sistema",
+        "RI130_623721833_teste.csv   ← dados técnicos (rede, latência...)\n"
+        "RI130_623721833_teste.xls   ← posição e endereço (SSO)\n"
+        "RI130_623721833_teste.kml   ← raio de incerteza (SSO)",
         language="text")
-    st.markdown("""
-Repita o padrão para cada rastreador (mesmo nome-base, extensões `.csv`, `.xls`,
-`.kml`). Não é obrigatório ter as três — suba as que tiver.
-""")
+    st.markdown("Não é obrigatório ter todos — o app usa o que você fornecer.")
 
     # ── Passo a passo ──
     st.markdown("#### 🚀 Passo a passo")
     st.markdown("""
-1. **Baixe os relatórios** de cada rastreador (CSV no portal de firmware; XLS e KML
-   no portal SSO/PST).
-2. **Mantenha o mesmo nome** para os arquivos do mesmo equipamento — só muda a
-   extensão (`.csv`, `.xls`, `.kml`). O app os une automaticamente.
-3. **Suba os arquivos** na seção *Importar Arquivos*.
-4. **Escolha a referência** (o rastreador com GPS ligado, normalmente o RI130) e
-   marque quais comparar.
+1. **Baixe os dados** de cada rastreador. O mais simples é o **CSV do Gerenciamento de
+   Firmware**, que já traz tudo. (Alternativamente, XLS + KML do SSO.)
+2. **Suba os arquivos** na seção *Importar Arquivos* — ou abra um teste salvo no
+   **Histórico**.
+3. **Escolha o modo**: *Comparativo* (referência × amostras) ou *Individual*
+   (inspecionar cada peça isoladamente).
+4. No modo comparativo, **escolha a referência** (rastreador com GPS ligado,
+   normalmente o RI130) e marque quais comparar.
 5. **Ajuste na barra lateral** a tolerância de horário e os raios de precisão
    (1 / 3 / 5 km, editáveis).
-6. Clique em **Iniciar Análise Completa** e navegue pelas abas.
+6. Clique em **Iniciar Análise** e navegue pelas abas.
 7. Na aba **Dados & Export**, baixe o Excel com tabelas e gráficos.
 """)
 
