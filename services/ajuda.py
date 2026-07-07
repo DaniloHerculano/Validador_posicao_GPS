@@ -34,10 +34,22 @@ def render_ajuda():
     sec("Como usar a plataforma")
 
     st.markdown("""
-Esta ferramenta compara a posição de rastreadores com **GPS ligado** (posição real)
-contra rastreadores com **GPS desligado** (posição estimada por antena de celular),
-medindo o quão distante a estimativa ficou da referência real — e ainda valida se a
-posição caiu **dentro do raio de incerteza que o próprio sistema** informa.
+Plataforma de análise de **testes de rodagem** de rastreadores. Além de comparar a
+posição de um rastreador com **GPS ligado** (referência real) contra rastreadores com
+**GPS desligado** (posição estimada por antena de celular) — medindo o erro e validando
+se a posição caiu dentro do **raio de incerteza** do sistema —, a ferramenta também
+analisa, para cada peça:
+
+- **Rede e modem:** tecnologia (2G/3G/4G), operadora e banda/frequência utilizada;
+- **Qualidade de GPS:** satélites e índices de precisão (quando o GPS está ligado);
+- **Bateria:** nível e consumo ao longo do teste;
+- **Movimento:** velocidade e direção;
+- **Latência e buffer:** tempo de envio ao servidor, separando a transmissão em tempo
+  real dos dados recuperados após perda de sinal.
+
+Você pode usar o modo **Comparativo** (referência × amostras) ou o modo **Individual**
+(inspecionar cada peça isoladamente, sem comparar). Também é possível **salvar e reabrir
+testes** pelo Histórico e **exportar** um relatório completo em Excel.
 """)
 
     # ── Os arquivos ──
