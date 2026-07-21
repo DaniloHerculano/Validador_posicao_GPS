@@ -147,3 +147,8 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
 
 ## v0.11.3
 - Modo **Individual** ganhou as abas **Visão Geral** (panorama dos equipamentos + destaques por área) e **Mapa** (plota as posições registradas de cada peça, distinguindo GPS real de estimada, sem comparação).
+
+## v0.11.4
+- **Tabela de operadoras completa e corrigida** (base oficial MCC/MNC Brasil): adicionadas Oi, Algar, Nextel, Brasil Telecom, Sercomtel e diversas MVNOs; corrigidos códigos que estavam errados (72406 era Vivo e estava como TIM; 72431 era Oi e estava como Vivo; 72432 era Algar; 72454 é Conecta). Reduz drasticamente os "Desconhecido".
+- Novo rótulo **"Sem Operadora"** para o código nulo 00000 (modem sem registro fixado), distinto de "Desconhecido" (código não mapeado).
+- Aba Rede: explicação do que significa **Sem Sinal**, **Sem Operadora** e **Desconhecido**.
