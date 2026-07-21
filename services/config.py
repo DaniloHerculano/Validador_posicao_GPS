@@ -4,9 +4,28 @@ config.py — Constantes, paleta de cores Stoneridge e tema dos gráficos.
 
 # ── Mapeamento de operadoras por código MCC+MNC (campo networkinfo) ──
 OPERADORAS = {
-    "72402": "TIM", "72403": "TIM", "72404": "TIM", "72454": "TIM", "72406": "TIM",
+    # Vivo (Telefônica Brasil)
+    "72410": "Vivo", "72411": "Vivo", "72423": "Vivo", "72406": "Vivo",
+    # Claro
     "72405": "Claro", "72438": "Claro",
-    "72410": "Vivo", "72411": "Vivo", "72423": "Vivo", "72431": "Vivo", "72432": "Vivo",
+    # TIM (Telecom Italia Mobile)
+    "72402": "TIM", "72403": "TIM", "72404": "TIM",
+    # Oi
+    "72431": "Oi", "72430": "Oi",
+    # Algar Telecom
+    "72432": "Algar", "72433": "Algar", "72434": "Algar",
+    # Nextel (NII Holdings)
+    "72400": "Nextel", "72439": "Nextel",
+    # Brasil Telecom
+    "72416": "Brasil Telecom",
+    # Sercomtel
+    "72415": "Sercomtel",
+    # Amazônia Celular
+    "72424": "Amazônia Celular",
+    # MVNOs e demais
+    "72417": "Correios", "72418": "Datora", "72454": "Conecta",
+    "72401": "Sisteer", "72436": "Options", "72435": "Telcom",
+    "72437": "Unicel", "72428": "Sem nome", "72499": "Local",
 }
 
 # ── Mapeamento de tecnologia de rede (string do networkinfo → geração) ──
