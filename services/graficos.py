@@ -655,7 +655,16 @@ def _rede_um(df_raw, titulo, df_prec=None, kid="x", expandir=False):
 
 
 def aba_rede(resultados, df_ref, ref_nome, comparacao, dados):
-    explicacao("Analisa **como o rastreador se comunica**: tecnologia (2G/3G/4G), operadora e a **banda/frequência** do modem (GSM850/900/1800/1900, LTE B3/B7/B28...). Útil para avaliar o desempenho do modem. Vem do CSV técnico completo.")
+    explicacao("Analisa **como o rastreador se comunica**: tecnologia (2G/3G/4G), "
+               "operadora e a **banda/frequência** do modem (GSM850/900/1800/1900, "
+               "LTE B3/B7/B28...). Vem do CSV técnico completo.<br><br>"
+               "• <b>Sem Sinal</b> (na tecnologia): o registro não tinha rede alguma — o "
+               "modem estava sem cobertura (campo de rede vazio ou \"NO SERVICE\").<br>"
+               "• <b>Sem Operadora</b> (na operadora): o modem reportou código nulo "
+               "(00000), típico de quando está tentando se registrar mas ainda não fixou "
+               "numa operadora.<br>"
+               "• <b>Desconhecido</b> (na operadora): havia um código de operadora, mas "
+               "ele não está na tabela conhecida (operadora nova, MVNO ou roaming).")
     # Modo individual: sem referência, analisa cada peça de "dados"
     if df_ref is None or len(df_ref) == 0:
         for ci, item in enumerate(dados):
