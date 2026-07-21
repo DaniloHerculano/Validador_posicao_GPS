@@ -61,7 +61,11 @@ def parse_networkinfo(info) -> tuple:
                 break
     operadora = "Desconhecido"
     if len(parts) > 1:
-        operadora = OPERADORAS.get(parts[1].strip(), "Desconhecido")
+        codigo = parts[1].strip()
+        if codigo in ("00000", "000000", "0", ""):
+            operadora = "Sem Operadora"  # código nulo (modem sem registro fixado)
+        else:
+            operadora = OPERADORAS.get(codigo, "Desconhecido")
     banda = _normaliza_banda(parts[2] if len(parts) > 2 else "", tech)
     return tech, operadora, banda
 
