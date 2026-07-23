@@ -3,6 +3,7 @@ analise.py — Sincronização por horário entre referência e comparados,
 e cálculo de métricas de precisão.
 """
 import pandas as pd
+import numpy as np
 from services.loader import calcular_distancia
 
 
@@ -68,6 +69,90 @@ def resumo_raio(df: pd.DataFrame) -> dict:
         "raio_medio": round(val["raio_km"].mean(), 3),
         "raio_min": round(val["raio_km"].min(), 3),
         "raio_max": round(val["raio_km"].max(), 3),
+    }
+
+
+def analisar_buffer_lifo(df_raw: pd.DataFrame) -> dict:
+    """
+    Verifica se a recuperação do buffer segue a ordem LIFO esperada.
+
+    Quando o módulo perde sinal, ele armazena os registros localmente; ao
+    reconectar, o esperado é que suba primeiro os pontos mais recentes
+    (datetime_module maior) e só depois os mais antigos — ou seja, à medida
+    que o datetime_server avança dentro da rajada de recuperação, o
+    datetime_module deveria ser não-crescente.
+
+    Agrupa os registros marcados como buffer em "episódios" (rajadas
+    contínuas, na ordem de chegada ao servidor) e, para cada episódio,
+    calcula:
+      - taxa de pares fora de ordem (violações de "não-crescente")
+      - correlação de ordem (rank) entre a posição de chegada e o
+        datetime_module — próxima de -1 indica LIFO perfeito
+
+    Retorna None se não houver dados suficientes (sem colunas de
+    data/hora ou sem indicação de buffer).
+    """
+    if "datetime_module" not in df_raw.columns or "datetime_server" not in df_raw.columns:
+        return None
+    if "_buffer_bool" in df_raw.columns:
+        buf_mask_full = df_raw["_buffer_bool"].fillna(False)
+    elif "bufferstatus" in df_raw.columns:
+        buf_mask_full = df_raw["bufferstatus"].astype(str).str.strip().str.lower().isin(
+            ["t", "true", "1"])
+    else:
+        return None
+
+    df = df_raw.dropna(subset=["datetime_module", "datetime_server"]).copy()
+    if len(df) == 0:
+        return None
+    df["_buf"] = buf_mask_full.reindex(df.index).fillna(False)
+    df = df.sort_values("datetime_server").reset_index(drop=True)
+    df["_ep"] = (df["_buf"] != df["_buf"].shift()).cumsum()
+
+    episodios = []
+    for ep_id, g in df[df["_buf"]].groupby("_ep"):
+        if len(g) < 2:
+            continue
+        dm = g["datetime_module"].values
+        n = len(dm)
+        viol = 0
+        for i in range(n):
+            for j in range(i + 1, n):
+                if dm[j] > dm[i]:
+                    viol += 1
+        total_pares = n * (n - 1) // 2
+        conforme = (viol == 0)
+        rx = pd.Series(range(n)).rank().values
+        ry = pd.Series(dm).rank().values
+        rho = (np.corrcoef(rx, ry)[0, 1]
+               if (np.std(rx) > 0 and np.std(ry) > 0) else np.nan)
+        episodios.append({
+            "episodio": int(ep_id), "n_registros": n,
+            "inicio_server": g["datetime_server"].iloc[0],
+            "fim_server": g["datetime_server"].iloc[-1],
+            "modulo_mais_novo": g["datetime_module"].max(),
+            "modulo_mais_antigo": g["datetime_module"].min(),
+            "violacoes": viol, "pares_totais": total_pares,
+            "taxa_desordem_pct": round(viol / total_pares * 100, 1) if total_pares else 0.0,
+            "rho_ordem": round(rho, 3) if pd.notna(rho) else None,
+            "conforme_lifo": conforme,
+        })
+
+    if not episodios:
+        return None
+
+    ep_df = pd.DataFrame(episodios)
+    n_conforme = int(ep_df["conforme_lifo"].sum())
+    n_total = len(ep_df)
+    return {
+        "episodios_df": ep_df,
+        "n_episodios": n_total,
+        "n_conforme": n_conforme,
+        "pct_conforme": round(n_conforme / n_total * 100, 1),
+        "registros_em_episodios": int(ep_df["n_registros"].sum()),
+        "registros_fora_ordem": int(ep_df.loc[~ep_df["conforme_lifo"], "n_registros"].sum()),
+        "rho_medio": (round(ep_df["rho_ordem"].dropna().mean(), 3)
+                      if ep_df["rho_ordem"].notna().any() else None),
     }
 
 
