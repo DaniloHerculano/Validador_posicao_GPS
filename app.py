@@ -269,12 +269,16 @@ else:
 if not eh_individual:
   with abas[9]:
     sec("Exportar Análise Completa")
-    st.caption("Excel com Resumo, dados sincronizados por equipamento e consolidado Rede & Bateria.")
+    st.caption("Excel autossuficiente — pode ser lido sem acesso à plataforma. Inclui "
+               "Resumo, Rede & Bateria, Latência & Buffer, verificação de ordem LIFO, "
+               "validação do raio do sistema, dados sincronizados por equipamento e um "
+               "Glossário com todos os termos técnicos.")
     df_resumo = st.session_state.get("df_resumo")
     cE1, cE2 = st.columns(2)
     with cE1:
         st.download_button("📥  Baixar Excel Completo (.xlsx)",
-            data=gerar_excel(df_resumo, resultados, dados, raios=raios),
+            data=gerar_excel(df_resumo, resultados, dados, raios=raios,
+                             tolerancia=tolerancia, tol_fusao=tol_fusao),
             file_name="analise_posicionamento.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="dl_excel")
