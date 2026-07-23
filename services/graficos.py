@@ -10,7 +10,7 @@ from services.config import (
     SR_RED, SR_RED2, SR_SLATE, SR_LIGHT, COLORS_TECH, COLORS_RAIOS, PALETA,
     LATENCIA_BINS, LATENCIA_LABELS, LATENCIA_CORES,
 )
-from services.ui import tile, grid, sec, aplica_tema, explicacao
+from services.ui import tile, grid, sec, aplica_tema, explicacao, info_tip, fmt_duracao
 
 
 def _dtec(item):
@@ -184,7 +184,7 @@ def _destaques_areas(dados, _dtec):
             else:
                 bufm = pd.Series(False, index=dtec.index)
             lat_real = dtec[~bufm]["_latencia_s"].dropna()
-            reg["Latência real"] = f"{lat_real.mean():.1f}s" if len(lat_real) else "—"
+            reg["Latência real"] = fmt_duracao(lat_real.mean(), decimais=True) if len(lat_real) else "—"
             reg["Buffer"] = f"{int(bufm.sum())} reg." if bufm.any() else "—"
         linhas.append(reg)
 
@@ -887,29 +887,52 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
         st.caption("A latência em tempo real considera apenas registros **não** "
                    "bufferizados. Os pontos recuperados do buffer (atraso por perda de "
                    "sinal) são contabilizados à parte.")
+
+        AJUDA_LATENCIA = ("Tempo entre o registro ser gerado no módulo (datetime_module) "
+                           "e chegar ao servidor (datetime_server). Só considera pontos "
+                           "não bufferizados — mede a velocidade real de transmissão.")
+        AJUDA_BUFFER = ("Registro que o módulo guardou localmente por ter ficado sem "
+                         "sinal, e enviou depois, todo atrasado, quando a conexão "
+                         "voltou. bufferstatus = true. Não indica falha de envio em "
+                         "tempo real, apenas o efeito de uma perda de sinal.")
         grid(
-            tile("Latência Média (tempo real)", f"{media:.1f}s",
-                 cc="green" if media < 90 else "amber"),
-            tile("Latência Máx (tempo real)", f"{mx:.0f}s"),
-            tile("% ≤90s (tempo real)", f"{pok:.1f}%", cc="green"),
+            tile("Latência Média (tempo real)", fmt_duracao(media, decimais=True),
+                 cc="green" if media < 90 else "amber", help_texto=AJUDA_LATENCIA),
+            tile("Latência Máx (tempo real)", fmt_duracao(mx), help_texto=AJUDA_LATENCIA),
+            tile("% ≤90s (tempo real)", f"{pok:.1f}%", cc="green",
+                 help_texto="Percentual dos registros em tempo real com latência de "
+                            "até 90 segundos — o limite considerado saudável."),
             tile("Registros bufferizados", f"{len(dfl_buf):,}",
                  f"{len(dfl_buf)/len(dfl)*100:.1f}% do total",
-                 cc="amber" if len(dfl_buf) else ""),
+                 cc="amber" if len(dfl_buf) else "", help_texto=AJUDA_BUFFER),
         )
         if len(dfl_buf) > 0:
-            st.markdown(f"**Buffer (recuperação de sinal):** {len(dfl_buf)} registros "
-                        f"subiram atrasados, com latência de "
-                        f"{dfl_buf['_latencia_s'].min():.0f}s a "
-                        f"{dfl_buf['_latencia_s'].max():.0f}s "
-                        f"(média {dfl_buf['_latencia_s'].mean():.0f}s). "
-                        f"São normais após perda de sinal e não indicam falha de envio "
-                        f"em tempo real.")
+            st.markdown(
+                f'**Buffer (recuperação de sinal)** {info_tip(AJUDA_BUFFER)}<br>'
+                f"{len(dfl_buf)} registros subiram atrasados, com latência de "
+                f"{fmt_duracao(dfl_buf['_latencia_s'].min())} a "
+                f"{fmt_duracao(dfl_buf['_latencia_s'].max())} "
+                f"(média {fmt_duracao(dfl_buf['_latencia_s'].mean())}). "
+                f"São normais após perda de sinal e não indicam falha de envio "
+                f"em tempo real.",
+                unsafe_allow_html=True)
 
             # ── Verificação de ordem LIFO na recuperação do buffer ──
             from services.analise import analisar_buffer_lifo
             lifo = analisar_buffer_lifo(df_raw)
             if lifo:
-                st.markdown("**Verificação de ordem LIFO no buffer**")
+                AJUDA_LIFO = ("LIFO = Last In, First Out. Ao perder sinal, o módulo "
+                              "acumula os pontos numa fila local; ao reconectar, ele "
+                              "sobe primeiro os registros mais recentes e só depois os "
+                              "mais antigos (como uma pilha, não uma fila comum). É o "
+                              "comportamento esperado do equipamento — não é um erro. "
+                              "Aqui verificamos se essa ordem realmente aconteceu: "
+                              "dentro de cada rajada de recuperação (episódio), o "
+                              "datetime_module deveria vir sempre decrescente à medida "
+                              "que os registros chegam ao servidor. Quando isso não "
+                              "acontece, o episódio fica marcado como 'fora de ordem'.")
+                st.markdown(f'**Verificação de ordem LIFO no buffer** {info_tip(AJUDA_LIFO)}',
+                            unsafe_allow_html=True)
                 st.caption(
                     "Ao perder sinal, o módulo guarda os pontos localmente. Ao "
                     "reconectar, o esperado é que suba primeiro os registros mais "
@@ -920,13 +943,24 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
                 cc = ("green" if lifo["pct_conforme"] >= 90
                       else ("amber" if lifo["pct_conforme"] >= 70 else ""))
                 grid(
-                    tile("Episódios de buffer", f"{lifo['n_episodios']}"),
-                    tile("% episódios em ordem LIFO", f"{lifo['pct_conforme']}%", cc=cc),
+                    tile("Episódios de buffer", f"{lifo['n_episodios']}",
+                         help_texto="Cada perda de sinal seguida de recuperação gera "
+                                    "um episódio: uma rajada contínua de registros "
+                                    "bufferizados chegando ao servidor."),
+                    tile("% episódios em ordem LIFO", f"{lifo['pct_conforme']}%", cc=cc,
+                         help_texto="Percentual de episódios em que o datetime_module "
+                                    "veio 100% decrescente — ou seja, LIFO perfeito."),
                     tile("Registros fora de ordem", f"{lifo['registros_fora_ordem']:,}",
-                         cc="amber" if lifo["registros_fora_ordem"] else "green"),
+                         cc="amber" if lifo["registros_fora_ordem"] else "green",
+                         help_texto="Quantidade de registros que pertencem a episódios "
+                                    "onde a ordem LIFO não foi respeitada."),
                     tile("Correlação média de ordem",
                          f"{lifo['rho_medio']}" if lifo["rho_medio"] is not None else "—",
-                         "-1 = LIFO perfeito, 0 = aleatório"),
+                         "-1 = LIFO perfeito, 0 = aleatório",
+                         help_texto="Correlação de ranking entre a ordem de chegada ao "
+                                    "servidor e o datetime_module dentro dos episódios. "
+                                    "-1 = ordem LIFO perfeita, 0 = sem relação (ordem "
+                                    "aleatória), +1 = ordem invertida (FIFO)."),
                 )
                 ep_df = lifo["episodios_df"]
                 problematicos = ep_df[~ep_df["conforme_lifo"]].sort_values(
@@ -979,7 +1013,7 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
 
 
 def aba_latencia(df_ref, ref_nome, comparacao, dados):
-    explicacao("Mede o **tempo entre o registro no módulo e a chegada ao servidor** (latência). Separa a transmissão **em tempo real** dos registros **recuperados do buffer** — que sobem atrasados após perda de sinal e, por serem LIFO, não representam a velocidade real de envio.")
+    explicacao("Mede o **tempo entre o registro no módulo e a chegada ao servidor** (latência). Separa a transmissão **em tempo real** dos registros **recuperados do buffer** — que sobem atrasados após perda de sinal e, por serem LIFO (os mais novos sobem primeiro), não representam a velocidade real de envio. Passe o mouse nos ícones **?** para entender cada métrica.")
     # Modo individual: sem referência, analisa cada peça de "dados"
     if df_ref is None or len(df_ref) == 0:
         for ci, item in enumerate(dados):
