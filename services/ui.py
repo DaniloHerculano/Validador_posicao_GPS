@@ -8,13 +8,48 @@ import streamlit as st
 from services.config import PLOTLY_THEME
 
 
-def tile(label, value, sub="", cc="") -> str:
+def tile(label, value, sub="", cc="", help_texto="") -> str:
+    tip = (f'<span class="info-tip" title="{help_texto.replace(chr(34), "&quot;")}">?</span>'
+           if help_texto else "")
     return (
         f'<div class="m-tile {cc}">'
-        f'<div class="m-tile-label">{label}</div>'
+        f'<div class="m-tile-label">{label}{tip}</div>'
         f'<div class="m-tile-val">{value}</div>'
         f'<div class="m-tile-sub">{sub}</div></div>'
     )
+
+
+def info_tip(texto: str) -> str:
+    """
+    Ícone "?" com tooltip nativo do navegador (atributo title), exibido ao
+    passar o mouse. Usar dentro de textos renderizados com
+    st.markdown(..., unsafe_allow_html=True).
+    """
+    return f'<span class="info-tip" title="{texto.replace(chr(34), "&quot;")}">?</span>'
+
+
+def fmt_duracao(segundos, decimais=False) -> str:
+    """
+    Formata uma duração em segundos como texto legível (s / min / h).
+    Ex.: 4.9 -> "4.9s" · 527 -> "8min 47s" · 218325 -> "60h 38min"
+    """
+    if segundos is None:
+        return "—"
+    try:
+        seg = float(segundos)
+    except (TypeError, ValueError):
+        return "—"
+    if seg != seg:  # NaN check sem depender de pandas/numpy
+        return "—"
+    sinal = "-" if seg < 0 else ""
+    seg = abs(seg)
+    if seg < 60:
+        return f"{sinal}{seg:.1f}s" if decimais else f"{sinal}{seg:.0f}s"
+    minutos_totais, s = divmod(int(round(seg)), 60)
+    horas, minutos = divmod(minutos_totais, 60)
+    if horas > 0:
+        return f"{sinal}{horas}h {minutos}min"
+    return f"{sinal}{minutos}min {s}s"
 
 
 def grid(*tiles_html):
@@ -135,6 +170,13 @@ h1,h2,h3,h4{font-family:'Barlow Condensed',sans-serif!important;font-weight:700!
   font-family:'Barlow Condensed',sans-serif;font-weight:700;margin-bottom:.2rem;}
 .m-tile-val{font-family:'Barlow Condensed',sans-serif;font-size:1.7rem;font-weight:800;color:var(--slate);line-height:1.05;}
 .m-tile-sub{font-size:.7rem;color:var(--muted);margin-top:.15rem;}
+
+/* Ícone de ajuda com tooltip nativo (title) ao passar o mouse */
+.info-tip{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;
+  margin-left:5px;border-radius:50%;background:var(--light);color:#2477b3;
+  font-size:.62rem;font-weight:700;font-family:'Barlow',sans-serif;cursor:help;
+  border:1px solid #b8d5ee;vertical-align:middle;line-height:1;}
+.info-tip:hover{background:#2477b3;color:#fff;}
 
 /* Botões */
 .stButton>button{background:var(--red)!important;color:#fff!important;border:none!important;border-radius:7px!important;
