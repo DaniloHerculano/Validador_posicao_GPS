@@ -905,6 +905,45 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
                         f"São normais após perda de sinal e não indicam falha de envio "
                         f"em tempo real.")
 
+            # ── Verificação de ordem LIFO na recuperação do buffer ──
+            from services.analise import analisar_buffer_lifo
+            lifo = analisar_buffer_lifo(df_raw)
+            if lifo:
+                st.markdown("**Verificação de ordem LIFO no buffer**")
+                st.caption(
+                    "Ao perder sinal, o módulo guarda os pontos localmente. Ao "
+                    "reconectar, o esperado é que suba primeiro os registros mais "
+                    "recentes (LIFO). Cada **episódio** abaixo é uma rajada contínua "
+                    "de registros bufferizados; verificamos se, dentro dela, o "
+                    "datetime_module realmente chega em ordem decrescente."
+                )
+                cc = ("green" if lifo["pct_conforme"] >= 90
+                      else ("amber" if lifo["pct_conforme"] >= 70 else ""))
+                grid(
+                    tile("Episódios de buffer", f"{lifo['n_episodios']}"),
+                    tile("% episódios em ordem LIFO", f"{lifo['pct_conforme']}%", cc=cc),
+                    tile("Registros fora de ordem", f"{lifo['registros_fora_ordem']:,}",
+                         cc="amber" if lifo["registros_fora_ordem"] else "green"),
+                    tile("Correlação média de ordem",
+                         f"{lifo['rho_medio']}" if lifo["rho_medio"] is not None else "—",
+                         "-1 = LIFO perfeito, 0 = aleatório"),
+                )
+                ep_df = lifo["episodios_df"]
+                problematicos = ep_df[~ep_df["conforme_lifo"]].sort_values(
+                    "taxa_desordem_pct", ascending=False)
+                if len(problematicos) > 0:
+                    st.markdown(f"**{len(problematicos)} episódio(s) fora de ordem LIFO "
+                                f"(maior desordem primeiro):**")
+                    tab = problematicos.head(10)[[
+                        "episodio", "n_registros", "inicio_server", "fim_server",
+                        "taxa_desordem_pct", "rho_ordem"]].copy()
+                    tab.columns = ["Episódio", "Registros", "Início (servidor)",
+                                   "Fim (servidor)", "% pares fora de ordem",
+                                   "Correlação de ordem"]
+                    st.dataframe(tab, width='stretch', hide_index=True)
+                else:
+                    st.success("Todos os episódios de buffer respeitaram a ordem LIFO.")
+
         dfl_real2 = base_real.copy()
         dfl_real2["_cat"] = pd.cut(dfl_real2["_latencia_s"], bins=LATENCIA_BINS,
                                    labels=LATENCIA_LABELS)
