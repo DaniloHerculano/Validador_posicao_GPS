@@ -152,7 +152,7 @@ def ler_csv(arquivo) -> pd.DataFrame:
             df[col] = pd.to_datetime(df[col], errors="coerce")
     for col in ["latitude", "longitude", "altitude", "heading", "speed",
                 "hdop", "vdop", "sdop", "satellitenumber", "voltage",
-                "xaccel", "yaccel", "zaccel"]:
+                "xaccel", "yaccel", "zaccel", "internal_temperature"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
     if "internalbatterylevel" in df.columns:
@@ -245,7 +245,8 @@ def ler_firmware_completo(arquivo) -> pd.DataFrame:
     # Numéricos
     for col in ["latitude", "longitude", "altitude", "heading", "speed",
                 "hdop", "vdop", "sdop", "satellitenumber", "voltage", "radius",
-                "internalbatterylevel", "xaccel", "yaccel", "zaccel"]:
+                "internalbatterylevel", "xaccel", "yaccel", "zaccel",
+                "internal_temperature"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
@@ -321,7 +322,8 @@ def enriquecer_csv(df: pd.DataFrame) -> pd.DataFrame:
 # ── Fusão XLS + CSV ───────────────────────────────────────────────────────────
 COLS_TEC_CSV = ["_tech", "_operadora", "_banda", "_latencia_s", "satellitenumber",
                 "hdop", "vdop", "sdop", "altitude", "heading", "transmissiontype",
-                "networktype", "bufferstatus", "_movimento", "_bateria_pct_csv", "voltage"]
+                "networktype", "bufferstatus", "_movimento", "_bateria_pct_csv", "voltage",
+                "internal_temperature", "mainsupply", "ignition", "blocking"]
 
 
 def fundir(df_xls: pd.DataFrame, df_csv: pd.DataFrame, tol_seg=60) -> pd.DataFrame:
