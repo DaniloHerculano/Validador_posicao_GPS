@@ -921,16 +921,22 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
             from services.analise import analisar_buffer_lifo
             lifo = analisar_buffer_lifo(df_raw)
             if lifo:
-                AJUDA_LIFO = ("LIFO = Last In, First Out. Ao perder sinal, o módulo "
-                              "acumula os pontos numa fila local; ao reconectar, ele "
-                              "sobe primeiro os registros mais recentes e só depois os "
-                              "mais antigos (como uma pilha, não uma fila comum). É o "
-                              "comportamento esperado do equipamento — não é um erro. "
-                              "Aqui verificamos se essa ordem realmente aconteceu: "
-                              "dentro de cada rajada de recuperação (episódio), o "
-                              "datetime_module deveria vir sempre decrescente à medida "
-                              "que os registros chegam ao servidor. Quando isso não "
-                              "acontece, o episódio fica marcado como 'fora de ordem'.")
+                AJUDA_LIFO = (
+                    "LIFO = Last In, First Out. Ao perder sinal, o módulo guarda os "
+                    "pontos numa fila local; ao reconectar, ele sobe primeiro os "
+                    "registros mais recentes e só depois os mais antigos (como uma "
+                    "pilha, não uma fila comum). É o comportamento esperado — não é "
+                    "um erro.\n\n"
+                    "Exemplo: o módulo perde sinal e guarda os pontos das 12:10, "
+                    "12:20 e 12:30 (datetime_module). Ao reconectar, ele deve enviar "
+                    "primeiro o das 12:30, depois o das 12:20, depois o das 12:10 — "
+                    "os três chegam ao servidor (datetime_server) quase juntos, mas "
+                    "nessa ordem decrescente.\n\n"
+                    "Cada rajada de recuperação vira um 'episódio'. Dentro dele, "
+                    "comparamos CADA PAR de registros: se o que chegou depois tem um "
+                    "datetime_module mais novo que o que chegou antes, esse par está "
+                    "'fora de ordem'. Um episódio 100% correto tem 0% de pares fora "
+                    "de ordem.")
                 st.markdown(f'**Verificação de ordem LIFO no buffer** {info_tip(AJUDA_LIFO)}',
                             unsafe_allow_html=True)
                 st.caption(
@@ -938,22 +944,29 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
                     "reconectar, o esperado é que suba primeiro os registros mais "
                     "recentes (LIFO). Cada **episódio** abaixo é uma rajada contínua "
                     "de registros bufferizados; verificamos se, dentro dela, o "
-                    "datetime_module realmente chega em ordem decrescente."
+                    "datetime_module realmente chega em ordem decrescente. Passe o "
+                    "mouse no **?** acima para ver um exemplo passo a passo."
                 )
                 cc = ("green" if lifo["pct_conforme"] >= 90
                       else ("amber" if lifo["pct_conforme"] >= 70 else ""))
                 grid(
                     tile("Episódios de buffer", f"{lifo['n_episodios']}",
                          help_texto="Cada perda de sinal seguida de recuperação gera "
-                                    "um episódio: uma rajada contínua de registros "
-                                    "bufferizados chegando ao servidor."),
+                                    "um 'episódio': uma rajada contínua de registros "
+                                    "bufferizados chegando ao servidor em sequência. "
+                                    "Ex.: os 3 pontos das 12:10/12:20/12:30 que sobem "
+                                    "juntos ao reconectar formam 1 episódio."),
                     tile("% episódios em ordem LIFO", f"{lifo['pct_conforme']}%", cc=cc,
-                         help_texto="Percentual de episódios em que o datetime_module "
-                                    "veio 100% decrescente — ou seja, LIFO perfeito."),
+                         help_texto="Percentual de episódios em que TODOS os registros "
+                                    "chegaram em ordem decrescente de datetime_module "
+                                    "(mais novo primeiro) — ou seja, LIFO perfeito, "
+                                    "sem nenhum par fora de ordem."),
                     tile("Registros fora de ordem", f"{lifo['registros_fora_ordem']:,}",
                          cc="amber" if lifo["registros_fora_ordem"] else "green",
                          help_texto="Quantidade de registros que pertencem a episódios "
-                                    "onde a ordem LIFO não foi respeitada."),
+                                    "onde a ordem LIFO não foi 100% respeitada (o "
+                                    "episódio inteiro conta, não só o registro que "
+                                    "quebrou a ordem)."),
                     tile("Correlação média de ordem",
                          f"{lifo['rho_medio']}" if lifo["rho_medio"] is not None else "—",
                          "-1 = LIFO perfeito, 0 = aleatório",
@@ -963,6 +976,7 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
                                     "aleatória), +1 = ordem invertida (FIFO)."),
                 )
                 ep_df = lifo["episodios_df"]
+                reg_df = lifo["registros_df"]
                 problematicos = ep_df[~ep_df["conforme_lifo"]].sort_values(
                     "taxa_desordem_pct", ascending=False)
                 if len(problematicos) > 0:
@@ -974,7 +988,32 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
                     tab.columns = ["Episódio", "Registros", "Início (servidor)",
                                    "Fim (servidor)", "% pares fora de ordem",
                                    "Correlação de ordem"]
+                    st.caption(
+                        "**Episódio** = número da rajada · **Registros** = quantos "
+                        "pontos bufferizados vieram nela · **Início/Fim (servidor)** = "
+                        "janela em que a rajada chegou ao servidor · **% pares fora de "
+                        "ordem** = de todos os pares de registros da rajada, quantos "
+                        "vieram na ordem errada (mais novo chegando depois do mais "
+                        "antigo). Abra um episódio abaixo para ver registro por "
+                        "registro."
+                    )
                     st.dataframe(tab, width='stretch', hide_index=True)
+
+                    st.markdown("**Ver registro por registro (episódios mais graves):**")
+                    for _, ep_row in problematicos.head(5).iterrows():
+                        ep_id = ep_row["episodio"]
+                        det = reg_df[reg_df["episodio"] == ep_id].copy()
+                        det_show = det[["ordem_chegada", "datetime_module",
+                                        "datetime_server", "quebrou_ordem"]].copy()
+                        det_show.columns = ["Ordem de chegada", "Datetime módulo",
+                                             "Datetime servidor", "Quebrou a ordem?"]
+                        det_show["Quebrou a ordem?"] = det_show["Quebrou a ordem?"].map(
+                            {True: "⚠️ Sim — chegou mais novo que um anterior",
+                             False: "✅ Não"})
+                        with st.expander(
+                            f"Episódio {ep_id} — {ep_row['n_registros']} registros, "
+                            f"{ep_row['taxa_desordem_pct']}% dos pares fora de ordem"):
+                            st.dataframe(det_show, width='stretch', hide_index=True)
                 else:
                     st.success("Todos os episódios de buffer respeitaram a ordem LIFO.")
 
