@@ -815,35 +815,124 @@ def aba_movimento(df_ref, ref_nome, comparacao, dados):
 # ══════════════════════════════════════════════════════════════════════════════
 def _bat_um(df_raw, titulo, kid="x", expandir=False):
     with st.expander(titulo, expanded=expandir):
-        if "_bateria_pct" not in df_raw.columns or df_raw["_bateria_pct"].isna().all():
-            st.info("📄 Bateria vem do **XLS** (em %) ou do CSV. Suba ao menos um deles para ver esta análise."); return
-        dfb = df_raw.dropna(subset=["_bateria_pct", "datetime_module"]).sort_values("datetime_module")
-        if len(dfb) == 0:
-            st.info("Nenhum dado de bateria com timestamp válido."); return
-        ini = dfb["_bateria_pct"].iloc[0]; fim = dfb["_bateria_pct"].iloc[-1]
-        cons = ini - fim; media = dfb["_bateria_pct"].mean(); mn = dfb["_bateria_pct"].min()
-        grid(
-            tile("Bateria Início", f"{ini:.0f}%", cc="green"),
-            tile("Bateria Fim", f"{fim:.0f}%", f"mín: {mn:.0f}%"),
-            tile("Consumo", f"{cons:.0f}%", cc="amber" if cons > 20 else "green"),
-            tile("Média", f"{media:.1f}%", cc="blue"),
-        )
-        fig = px.line(dfb, x="datetime_module", y="_bateria_pct",
-            title="Nível de Bateria Interna (%)", color_discrete_sequence=[SR_RED])
-        fig.add_hrect(y0=0, y1=20, fillcolor="#ef4444", opacity=0.1, line_width=0,
-            annotation_text="Crítico (<20%)", annotation_font_color="#ef4444")
-        fig.add_hrect(y0=20, y1=50, fillcolor="#f59e0b", opacity=0.07, line_width=0)
-        fig.update_layout(yaxis=dict(range=[0, 105], title="Bateria (%)"))
-        st.plotly_chart(aplica_tema(fig), width='stretch', key=f"bat_{kid}")
+        tem_bateria = ("_bateria_pct" in df_raw.columns and df_raw["_bateria_pct"].notna().any())
+        tem_temp = ("internal_temperature" in df_raw.columns and df_raw["internal_temperature"].notna().any())
+        tem_mains = ("mainsupply" in df_raw.columns and df_raw["mainsupply"].notna().any())
+        tem_ign = ("ignition" in df_raw.columns and df_raw["ignition"].notna().any())
+        tem_block = ("blocking" in df_raw.columns and df_raw["blocking"].notna().any())
+
+        if not any([tem_bateria, tem_temp, tem_mains, tem_ign, tem_block]):
+            st.info("📄 Bateria/energia vêm do **XLS** (bateria em %) ou do **CSV** (bateria, "
+                    "temperatura, alimentação, ignição, bloqueio). Suba ao menos um deles "
+                    "para ver esta análise.")
+            return
+
+        # ── Bateria (%) ──
+        if tem_bateria:
+            dfb = df_raw.dropna(subset=["_bateria_pct", "datetime_module"]).sort_values("datetime_module")
+            if len(dfb) > 0:
+                ini = dfb["_bateria_pct"].iloc[0]; fim = dfb["_bateria_pct"].iloc[-1]
+                cons = ini - fim; media = dfb["_bateria_pct"].mean(); mn = dfb["_bateria_pct"].min()
+                grid(
+                    tile("Bateria Início", f"{ini:.0f}%", cc="green"),
+                    tile("Bateria Fim", f"{fim:.0f}%", f"mín: {mn:.0f}%"),
+                    tile("Consumo", f"{cons:.0f}%", cc="amber" if cons > 20 else "green"),
+                    tile("Média", f"{media:.1f}%", cc="blue"),
+                )
+                fig = px.line(dfb, x="datetime_module", y="_bateria_pct",
+                    title="Nível de Bateria Interna (%)", color_discrete_sequence=[SR_RED])
+                fig.add_hrect(y0=0, y1=20, fillcolor="#ef4444", opacity=0.1, line_width=0,
+                    annotation_text="Crítico (<20%)", annotation_font_color="#ef4444")
+                fig.add_hrect(y0=20, y1=50, fillcolor="#f59e0b", opacity=0.07, line_width=0)
+                fig.update_layout(yaxis=dict(range=[0, 105], title="Bateria (%)"))
+                st.plotly_chart(aplica_tema(fig), width='stretch', key=f"bat_{kid}")
         if "voltage" in df_raw.columns and df_raw["voltage"].notna().any():
             dfv = df_raw.dropna(subset=["voltage", "datetime_module"]).sort_values("datetime_module")
             fig = px.line(dfv, x="datetime_module", y="voltage", title="Tensão (V)",
                 color_discrete_sequence=["#2477b3"])
             st.plotly_chart(aplica_tema(fig, 240), width='stretch', key=f"volt_{kid}")
 
+        # ── Temperatura interna ──
+        if tem_temp:
+            dft = df_raw.dropna(subset=["internal_temperature", "datetime_module"]).sort_values(
+                "datetime_module")
+            if len(dft) > 0:
+                tmin = dft["internal_temperature"].min()
+                tmax = dft["internal_temperature"].max()
+                tmed = dft["internal_temperature"].mean()
+                AJUDA_TEMP = (
+                    "Temperatura medida dentro do módulo (internal_temperature), em °C. "
+                    "Útil para checar se o equipamento ficou exposto a calor/frio "
+                    "excessivo durante o teste, ou se há aquecimento anormal do "
+                    "hardware. Não há um limite oficial de operação informado aqui — "
+                    "use como referência de tendência, não como veredito de segurança.")
+                st.markdown(f'🌡️ **Temperatura Interna** {info_tip(AJUDA_TEMP)}',
+                            unsafe_allow_html=True)
+                grid(
+                    tile("Mínima", f"{tmin:.0f}°C", cc="blue"),
+                    tile("Média", f"{tmed:.1f}°C"),
+                    tile("Máxima", f"{tmax:.0f}°C", cc="amber" if tmax >= 50 else "green"),
+                    tile("Registros", f"{len(dft):,}"),
+                )
+                fig = px.line(dft, x="datetime_module", y="internal_temperature",
+                    title="Temperatura Interna ao Longo do Tempo (°C)",
+                    color_discrete_sequence=["#e67e22"])
+                fig.update_layout(yaxis=dict(title="Temperatura (°C)"))
+                st.plotly_chart(aplica_tema(fig), width='stretch', key=f"temp_{kid}")
+
+        # ── Alimentação principal (mainsupply) ──
+        if tem_mains:
+            dfm = df_raw.dropna(subset=["mainsupply", "datetime_module"]).sort_values(
+                "datetime_module").copy()
+            dfm["_mains_bool"] = dfm["mainsupply"].astype(str).str.strip().str.lower().isin(
+                ["t", "true", "1"])
+            pct_on = dfm["_mains_bool"].mean() * 100
+            dfm["_grp"] = (dfm["_mains_bool"] != dfm["_mains_bool"].shift()).cumsum()
+            quedas = []
+            for gid, g in dfm[~dfm["_mains_bool"]].groupby("_grp"):
+                ini_q = g["datetime_module"].iloc[0]; fim_q = g["datetime_module"].iloc[-1]
+                dur = (fim_q - ini_q).total_seconds()
+                quedas.append({"Início da queda": ini_q, "Fim da queda": fim_q,
+                                "Duração": fmt_duracao(dur), "Registros": len(g)})
+            AJUDA_MAINS = (
+                "mainsupply indica se o equipamento está recebendo energia da fonte "
+                "principal do veículo (ex.: bateria do veículo). Quando fica 'false' "
+                "por um período, o equipamento passou a rodar só na bateria interna — "
+                "vale cruzar com o consumo de bateria acima.")
+            st.markdown(f'🔌 **Alimentação Principal** {info_tip(AJUDA_MAINS)}',
+                        unsafe_allow_html=True)
+            grid(
+                tile("Tempo com energia principal", f"{pct_on:.1f}%",
+                     cc="green" if pct_on >= 95 else "amber"),
+                tile("Quedas de energia detectadas", f"{len(quedas)}",
+                     cc="amber" if quedas else "green"),
+            )
+            if quedas:
+                st.dataframe(pd.DataFrame(quedas), width='stretch', hide_index=True)
+
+        # ── Ignição e Bloqueio (sensores digitais, quando disponíveis) ──
+        extras = []
+        if tem_ign:
+            ig = df_raw["ignition"].astype(str).str.strip().str.lower().isin(["t", "true", "1"])
+            extras.append(tile("Ignição ligada", f"{ig.mean()*100:.1f}% do tempo",
+                cc="blue", help_texto="Percentual dos registros com a ignição do veículo "
+                                      "detectada como ligada."))
+        if tem_block:
+            bl = df_raw["blocking"].astype(str).str.strip().str.lower().isin(["t", "true", "1"])
+            extras.append(tile("Bloqueio (imobilizador) ativo", f"{bl.mean()*100:.1f}% do tempo",
+                cc="amber" if bl.any() else "green",
+                help_texto="Percentual dos registros com o bloqueio/imobilizador do "
+                           "veículo ativado pelo equipamento."))
+        if extras:
+            st.markdown("🔧 **Outros sensores**")
+            grid(*extras)
+
 
 def aba_bateria(df_ref, ref_nome, comparacao, dados):
-    explicacao("Acompanha o **nível de bateria** (%) ao longo do teste, ajudando a avaliar o consumo do equipamento durante a viagem.")
+    explicacao("Acompanha o **nível de bateria** (%) e **tensão** ao longo do teste, além de "
+               "**temperatura interna**, **alimentação principal** (energia do veículo) e, "
+               "quando disponíveis, **ignição** e **bloqueio** — tudo que o log técnico "
+               "traz sobre a saúde/energia do equipamento.")
     # Modo individual: sem referência, analisa cada peça de "dados"
     if df_ref is None or len(df_ref) == 0:
         for ci, item in enumerate(dados):
