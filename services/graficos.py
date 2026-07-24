@@ -884,9 +884,11 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
         media = base_real["_latencia_s"].mean()
         mx = base_real["_latencia_s"].max()
         pok = (base_real["_latencia_s"] <= 90).mean() * 100
-        st.caption("A latência em tempo real considera apenas registros **não** "
-                   "bufferizados. Os pontos recuperados do buffer (atraso por perda de "
-                   "sinal) são contabilizados à parte.")
+        pct_real = len(base_real) / len(dfl) * 100 if len(dfl) else 0
+        pct_buf = len(dfl_buf) / len(dfl) * 100 if len(dfl) else 0
+        st.caption("A latência em tempo real e a latência do buffer vêm de **dois grupos "
+                   "diferentes de registros** — por isso os valores abaixo não são "
+                   "comparáveis entre si, cada bloco fala só do seu próprio grupo.")
 
         AJUDA_LATENCIA = ("Tempo entre o registro ser gerado no módulo (datetime_module) "
                            "e chegar ao servidor (datetime_server). Só considera pontos "
@@ -895,27 +897,45 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
                          "sinal, e enviou depois, todo atrasado, quando a conexão "
                          "voltou. bufferstatus = true. Não indica falha de envio em "
                          "tempo real, apenas o efeito de uma perda de sinal.")
+
+        # ── Bloco 1: transmissão em tempo real (bufferstatus = false) ──
+        st.markdown(f"🟢 **Transmissão em tempo real** — {len(base_real):,} de "
+                     f"{len(dfl):,} registros ({pct_real:.1f}% do total)")
         grid(
-            tile("Latência Média (tempo real)", fmt_duracao(media, decimais=True),
+            tile("Latência Média", fmt_duracao(media, decimais=True),
+                 f"entre os {len(base_real):,} registros em tempo real",
                  cc="green" if media < 90 else "amber", help_texto=AJUDA_LATENCIA),
-            tile("Latência Máx (tempo real)", fmt_duracao(mx), help_texto=AJUDA_LATENCIA),
-            tile("% ≤90s (tempo real)", f"{pok:.1f}%", cc="green",
+            tile("Latência Máx", fmt_duracao(mx),
+                 f"entre os {len(base_real):,} registros em tempo real",
+                 help_texto=AJUDA_LATENCIA),
+            tile("% ≤90s", f"{pok:.1f}%",
+                 f"entre os {len(base_real):,} registros em tempo real", cc="green",
                  help_texto="Percentual dos registros em tempo real com latência de "
                             "até 90 segundos — o limite considerado saudável."),
-            tile("Registros bufferizados", f"{len(dfl_buf):,}",
-                 f"{len(dfl_buf)/len(dfl)*100:.1f}% do total",
-                 cc="amber" if len(dfl_buf) else "", help_texto=AJUDA_BUFFER),
         )
+
         if len(dfl_buf) > 0:
-            st.markdown(
-                f'**Buffer (recuperação de sinal)** {info_tip(AJUDA_BUFFER)}<br>'
-                f"{len(dfl_buf)} registros subiram atrasados, com latência de "
-                f"{fmt_duracao(dfl_buf['_latencia_s'].min())} a "
-                f"{fmt_duracao(dfl_buf['_latencia_s'].max())} "
-                f"(média {fmt_duracao(dfl_buf['_latencia_s'].mean())}). "
-                f"São normais após perda de sinal e não indicam falha de envio "
-                f"em tempo real.",
-                unsafe_allow_html=True)
+            # ── Bloco 2: recuperados do buffer (bufferstatus = true) — mesma
+            # estrutura visual do bloco acima, mas é um grupo de registros
+            # totalmente diferente (não é continuação da latência em tempo real).
+            st.markdown(f"🟡 **Recuperados do buffer** {info_tip(AJUDA_BUFFER)} — "
+                        f"{len(dfl_buf):,} de {len(dfl):,} registros ({pct_buf:.1f}% do total)",
+                        unsafe_allow_html=True)
+            grid(
+                tile("Latência Mín", fmt_duracao(dfl_buf["_latencia_s"].min()),
+                     f"entre os {len(dfl_buf):,} registros do buffer", cc="amber",
+                     help_texto=AJUDA_BUFFER),
+                tile("Latência Máx", fmt_duracao(dfl_buf["_latencia_s"].max()),
+                     f"entre os {len(dfl_buf):,} registros do buffer", cc="amber",
+                     help_texto=AJUDA_BUFFER),
+                tile("Latência Média", fmt_duracao(dfl_buf["_latencia_s"].mean()),
+                     f"entre os {len(dfl_buf):,} registros do buffer", cc="amber",
+                     help_texto=AJUDA_BUFFER),
+            )
+            st.caption(
+                "São normais após perda de sinal e **não indicam falha de envio em "
+                "tempo real** — o bloco 🟢 acima é que mede a velocidade real de "
+                "transmissão do equipamento.")
 
             # ── Verificação de ordem LIFO na recuperação do buffer ──
             from services.analise import analisar_buffer_lifo
