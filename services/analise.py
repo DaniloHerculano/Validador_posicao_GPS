@@ -110,9 +110,11 @@ def analisar_buffer_lifo(df_raw: pd.DataFrame) -> dict:
     df["_ep"] = (df["_buf"] != df["_buf"].shift()).cumsum()
 
     episodios = []
+    registros_detalhe = []
     for ep_id, g in df[df["_buf"]].groupby("_ep"):
         if len(g) < 2:
             continue
+        g = g.reset_index(drop=True)
         dm = g["datetime_module"].values
         n = len(dm)
         viol = 0
@@ -138,14 +140,33 @@ def analisar_buffer_lifo(df_raw: pd.DataFrame) -> dict:
             "conforme_lifo": conforme,
         })
 
+        # Detalhe registro a registro: mostra a ordem real de chegada e
+        # aponta exatamente qual registro "quebrou" a sequência decrescente
+        # esperada (chegou mais novo do que algum registro anterior).
+        mais_novo_ate_agora = None
+        for pos in range(n):
+            dm_atual = g["datetime_module"].iloc[pos]
+            quebrou = (mais_novo_ate_agora is not None and dm_atual > mais_novo_ate_agora)
+            registros_detalhe.append({
+                "episodio": int(ep_id),
+                "ordem_chegada": pos + 1,
+                "datetime_module": dm_atual,
+                "datetime_server": g["datetime_server"].iloc[pos],
+                "quebrou_ordem": bool(quebrou),
+            })
+            if mais_novo_ate_agora is None or dm_atual > mais_novo_ate_agora:
+                mais_novo_ate_agora = dm_atual
+
     if not episodios:
         return None
 
+    registros_df = pd.DataFrame(registros_detalhe)
     ep_df = pd.DataFrame(episodios)
     n_conforme = int(ep_df["conforme_lifo"].sum())
     n_total = len(ep_df)
     return {
         "episodios_df": ep_df,
+        "registros_df": registros_df,
         "n_episodios": n_total,
         "n_conforme": n_conforme,
         "pct_conforme": round(n_conforme / n_total * 100, 1),
