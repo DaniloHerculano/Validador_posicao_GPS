@@ -226,7 +226,7 @@ if vazios:
 if eh_individual:
     # Modo individual: análises por peça + visão geral e mapa (sem comparação)
     abas = st.tabs(["📊 Visão Geral", "🗺 Mapa", "📶 Rede & Operadora", "🛰 Qualidade GPS",
-        "🚗 Movimento", "🔋 Bateria", "⏱ Latência", "📋 Dados", "💾 Histórico", "❓ Como Usar"])
+        "🚗 Movimento", "🔋 Bateria & Sensores", "⏱ Latência", "📋 Dados", "💾 Histórico", "❓ Como Usar"])
     vazio_df = pd.DataFrame()
     with abas[0]: g.aba_visao_geral({}, vazio_df, "", raios, dados)
     with abas[1]: g.aba_mapa_individual(dados)
@@ -252,7 +252,7 @@ if eh_individual:
             file_name=f"{nome_arquivo_seguro(sel)}.csv", mime="text/csv", key="dl_ind")
 else:
     abas = st.tabs(["📊 Visão Geral", "🗺 Mapa", "📍 Precisão GPS", "🎯 Raio do Sistema",
-        "📶 Rede & Operadora", "🛰 Qualidade GPS", "🚗 Movimento", "🔋 Bateria", "⏱ Latência",
+        "📶 Rede & Operadora", "🛰 Qualidade GPS", "🚗 Movimento", "🔋 Bateria & Sensores", "⏱ Latência",
         "📋 Dados & Export", "💾 Histórico", "❓ Como Usar"])
 
     with abas[0]: g.aba_visao_geral(resultados, df_ref, ref_nome, raios, dados)
