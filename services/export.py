@@ -93,20 +93,42 @@ GLOSSARIO = [
                                     "sem sinal, e enviou depois, todo atrasado, quando a conexão "
                                     "voltou. Não indica falha de envio em tempo real — é o efeito "
                                     "esperado de uma perda de sinal."),
-    ("LIFO (Last In, First Out)", "Comportamento esperado do módulo ao recuperar o buffer: ele "
-                                   "sobe primeiro os registros mais recentes e só depois os mais "
-                                   "antigos (como uma pilha, e não uma fila). É o funcionamento "
-                                   "normal do equipamento, não um erro."),
-    ("Episódio de Buffer", "Uma rajada contínua de registros bufferizados chegando ao servidor "
-                            "— corresponde a um ciclo de perda + recuperação de sinal."),
-    ("% Episódios em ordem LIFO", "Percentual de episódios em que o datetime_module veio 100% "
-                                   "decrescente ao longo da rajada — ou seja, LIFO perfeito."),
+    ("LIFO (Last In, First Out)",
+     "Comportamento esperado do módulo ao recuperar o buffer: ele sobe primeiro os "
+     "registros mais recentes e só depois os mais antigos (como uma pilha, e não uma "
+     "fila). É o funcionamento normal do equipamento, não um erro.\n\n"
+     "Exemplo: o módulo perde sinal e guarda os pontos das 12:10, 12:20 e 12:30 "
+     "(datetime_module). Ao reconectar, ele deve enviar primeiro o das 12:30, depois "
+     "o das 12:20, depois o das 12:10 — os três chegam ao servidor quase juntos "
+     "(datetime_server próximos), mas nessa ordem decrescente."),
+    ("Episódio de Buffer",
+     "Uma rajada contínua de registros bufferizados chegando ao servidor — "
+     "corresponde a um ciclo de perda + recuperação de sinal. No exemplo acima, os "
+     "3 pontos (12:10/12:20/12:30) que sobem juntos formam 1 episódio, com "
+     "'Registros' = 3."),
+    ("% Episódios em ordem LIFO",
+     "Percentual de episódios em que TODOS os registros chegaram em ordem "
+     "decrescente de datetime_module (mais novo primeiro) — ou seja, LIFO perfeito, "
+     "sem nenhum par fora de ordem."),
     ("Correlação de ordem (rho)", "Mede a relação entre a ordem de chegada ao servidor e o "
                                    "datetime_module dentro de um episódio de buffer. "
                                    "-1 = ordem LIFO perfeita · 0 = ordem aleatória · "
                                    "+1 = ordem invertida (FIFO)."),
     ("Registros fora de ordem", "Registros que pertencem a episódios de buffer onde a ordem "
-                                 "LIFO esperada não foi respeitada."),
+                                 "LIFO esperada não foi 100% respeitada."),
+    ("% pares fora de ordem",
+     "Dentro de um episódio, comparamos CADA PAR de registros pela ordem de chegada "
+     "ao servidor: se o que chegou depois tem um datetime_module mais novo que o que "
+     "chegou antes, esse par está 'fora de ordem'.\n\n"
+     "Exemplo com 4 registros chegando nesta ordem: 08:44, 08:34, 08:22, 15:15. Os "
+     "3 primeiros vêm certinho (decrescendo). Mas o 4º (15:15) é mais novo que os 3 "
+     "anteriores — ele deveria ter chegado primeiro. Isso gera 3 pares fora de ordem "
+     "em 6 pares possíveis = 50%."),
+    ("Quebrou a ordem?",
+     "Marca o registro específico que chegou com um datetime_module mais novo do que "
+     "algum registro anterior no mesmo episódio — ou seja, o ponto onde a sequência "
+     "LIFO esperada foi rompida. Ver a aba Buffer_LIFO_Detalhe para o registro a "
+     "registro de cada episódio fora de ordem."),
     ("% ≤90s (tempo real)", "Percentual dos registros em tempo real com latência de até 90 "
                              "segundos — limite de referência considerado saudável."),
 ]
@@ -135,7 +157,8 @@ def _aba_glossario(wb):
         ct.alignment = Alignment(vertical="top", wrap_text=True)
         ce = ws.cell(row=r, column=2, value=exp)
         ce.alignment = Alignment(vertical="top", wrap_text=True)
-        ws.row_dimensions[r].height = 32
+        n_linhas = exp.count("\n") + 1 + len(exp) // 90
+        ws.row_dimensions[r].height = max(32, 15 * n_linhas)
     ws.column_dimensions["A"].width = 30
     ws.column_dimensions["B"].width = 95
     return ws
@@ -362,6 +385,7 @@ def gerar_excel(df_resumo, resultados: dict, dados: list,
     # ── Aba BUFFER & LIFO ──
     resumo_lifo_linhas = []
     episodios_linhas = []
+    registros_lifo_linhas = []
     for d in dados:
         dft = _dtec(d)
         if dft is None:
@@ -380,6 +404,14 @@ def gerar_excel(df_resumo, resultados: dict, dados: list,
         ep_df = lifo["episodios_df"].copy()
         ep_df.insert(0, "Equipamento", nome_eq)
         episodios_linhas.append(ep_df)
+
+        # Detalhe registro a registro, só dos episódios que ficaram fora de ordem
+        eps_problematicos = set(ep_df.loc[~ep_df["conforme_lifo"], "episodio"])
+        if eps_problematicos:
+            reg_df = lifo["registros_df"]
+            reg_prob = reg_df[reg_df["episodio"].isin(eps_problematicos)].copy()
+            reg_prob.insert(0, "Equipamento", nome_eq)
+            registros_lifo_linhas.append(reg_prob)
 
     if resumo_lifo_linhas:
         ws5 = wb.create_sheet("Buffer_LIFO")
@@ -426,7 +458,69 @@ def gerar_excel(df_resumo, resultados: dict, dados: list,
             for c in ["Início (servidor)", "Fim (servidor)", "Módulo mais novo", "Módulo mais antigo"]:
                 if c in df_ep_all.columns:
                     df_ep_all[c] = df_ep_all[c].astype(str)
-            _escreve_df(ws5, df_ep_all, start_row=cur + 3)
+            det_hdr_row = cur + 3
+            _escreve_df(ws5, df_ep_all, start_row=det_hdr_row)
+            _comenta_colunas(ws5, df_ep_all, {
+                "Episódio": "Número da rajada de recuperação (perda de sinal seguida "
+                    "de reconexão). Ex.: os pontos das 12:10/12:20/12:30 que sobem "
+                    "juntos ao reconectar formam 1 episódio.",
+                "Registros": "Quantos pontos bufferizados vieram nessa rajada.",
+                "Início (servidor)": "Quando o primeiro registro dessa rajada chegou "
+                    "ao servidor.",
+                "Fim (servidor)": "Quando o último registro dessa rajada chegou ao "
+                    "servidor.",
+                "% fora de ordem": "De todos os pares de registros da rajada, quantos "
+                    "vieram na ordem errada (mais novo chegando depois do mais "
+                    "antigo). Ex.: 4 registros chegam na ordem 08:44 → 08:34 → 08:22 "
+                    "→ 15:15. O último (15:15) é mais novo que os 3 anteriores, "
+                    "gerando 3 pares fora de ordem em 6 pares possíveis = 50%.",
+                "Conforme LIFO?": "'Não' significa que pelo menos 1 par de registros "
+                    "nessa rajada veio fora da ordem decrescente esperada. Ver aba "
+                    "Buffer_LIFO_Detalhe para o registro que quebrou a ordem.",
+            }, nrow=det_hdr_row)
+
+    # ── Aba BUFFER & LIFO — DETALHE REGISTRO A REGISTRO ──
+    if registros_lifo_linhas:
+        ws5b = wb.create_sheet("Buffer_LIFO_Detalhe")
+        ws5b["A1"] = "Buffer fora de ordem — registro a registro"
+        ws5b["A1"].font = Font(bold=True, size=13, color=C_SLATE)
+        ws5b["A2"] = (
+            "Mostra, registro por registro, a ordem real de chegada ao servidor "
+            "dentro de cada episódio marcado como fora de ordem LIFO. 'Quebrou a "
+            "ordem?' = Sim no registro que chegou com um datetime_module mais novo "
+            "do que algum registro anterior do mesmo episódio — ou seja, o ponto "
+            "exato onde a sequência esperada (mais novo primeiro) foi rompida.")
+        ws5b["A2"].font = Font(size=9, italic=True, color="6B7F8F")
+        ws5b.merge_cells("A2:G2")
+        ws5b.row_dimensions[2].height = 42
+        ws5b["A2"].alignment = Alignment(wrap_text=True, vertical="top")
+
+        df_reg_all = pd.concat(registros_lifo_linhas, ignore_index=True)
+        df_reg_all = df_reg_all.rename(columns={
+            "episodio": "Episódio", "ordem_chegada": "Ordem de chegada",
+            "datetime_module": "Datetime módulo", "datetime_server": "Datetime servidor",
+            "quebrou_ordem": "Quebrou a ordem?",
+        })
+        df_reg_all["Quebrou a ordem?"] = df_reg_all["Quebrou a ordem?"].map(
+            {True: "Sim", False: "Não"})
+        for c in ["Datetime módulo", "Datetime servidor"]:
+            df_reg_all[c] = df_reg_all[c].astype(str)
+        reg_hdr_row = 4
+        _escreve_df(ws5b, df_reg_all, start_row=reg_hdr_row)
+        _comenta_colunas(ws5b, df_reg_all, {
+            "Ordem de chegada": "1º, 2º, 3º... registro a chegar ao servidor dentro "
+                "desse episódio (ordenado por datetime_server).",
+            "Quebrou a ordem?": "'Sim' = este registro tem datetime_module mais novo "
+                "do que algum registro anterior na mesma rajada — deveria ter "
+                "chegado antes, não depois.",
+        }, nrow=reg_hdr_row)
+        # Destaca em vermelho claro os registros que quebraram a ordem
+        col_quebrou = list(df_reg_all.columns).index("Quebrou a ordem?") + 1
+        fill_alerta = PatternFill("solid", fgColor="FBE1E6")
+        for r in range(reg_hdr_row + 1, reg_hdr_row + 1 + len(df_reg_all)):
+            if ws5b.cell(row=r, column=col_quebrou).value == "Sim":
+                for c in range(1, len(df_reg_all.columns) + 1):
+                    ws5b.cell(row=r, column=c).fill = fill_alerta
 
     # ── Aba RAIO DO SISTEMA (KML) ──
     resumo_raio_linhas = []
