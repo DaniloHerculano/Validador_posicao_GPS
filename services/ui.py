@@ -8,8 +8,23 @@ import streamlit as st
 from services.config import PLOTLY_THEME
 
 
+def _sanitiza_tooltip(texto: str) -> str:
+    """
+    Deixa o texto seguro para virar o atributo title="" de uma tag HTML
+    dentro de st.markdown(unsafe_allow_html=True).
+
+    IMPORTANTE: uma linha em branco (\\n\\n) dentro do texto é interpretada
+    pelo parser de markdown do Streamlit como quebra de parágrafo — isso
+    parte a tag HTML ao meio e faz ela aparecer como texto cru na tela em
+    vez de virar um tooltip. Por isso, qualquer quebra de linha é sempre
+    convertida em espaço antes de entrar no atributo title.
+    """
+    plano = " ".join(texto.split())  # remove \n, \t e espaços duplicados
+    return plano.replace('"', "&quot;")
+
+
 def tile(label, value, sub="", cc="", help_texto="") -> str:
-    tip = (f'<span class="info-tip" title="{help_texto.replace(chr(34), "&quot;")}">?</span>'
+    tip = (f'<span class="info-tip" title="{_sanitiza_tooltip(help_texto)}">?</span>'
            if help_texto else "")
     return (
         f'<div class="m-tile {cc}">'
@@ -25,7 +40,7 @@ def info_tip(texto: str) -> str:
     passar o mouse. Usar dentro de textos renderizados com
     st.markdown(..., unsafe_allow_html=True).
     """
-    return f'<span class="info-tip" title="{texto.replace(chr(34), "&quot;")}">?</span>'
+    return f'<span class="info-tip" title="{_sanitiza_tooltip(texto)}">?</span>'
 
 
 def fmt_duracao(segundos, decimais=False) -> str:
