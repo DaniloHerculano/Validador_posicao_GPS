@@ -1020,7 +1020,8 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
                 tile("Latência Média", fmt_duracao(dfl_buf["_latencia_s"].mean()),
                      f"entre os {len(dfl_buf):,} registros do buffer", cc="amber",
                      help_texto=AJUDA_BUFFER),
-            )
+                tile("Percentil 95\%", fmt_duracao(dfl_buf["_latencia_s"]).quantile(0.95)),
+                     f"entre os {len(dfl_buf):,} registros do buffer", cc="amber")
             st.caption(
                 "São normais após perda de sinal e **não indicam falha de envio em "
                 "tempo real** — o bloco 🟢 acima é que mede a velocidade real de "
