@@ -181,6 +181,8 @@ h1,h2,h3,h4{font-family:'Barlow Condensed',sans-serif!important;font-weight:700!
   border-radius:9px;padding:.85rem 1.15rem;min-width:115px;flex:1;box-shadow:0 1px 3px rgba(44,57,70,.05);}
 .m-tile.green{border-top-color:#1f8b4c;}.m-tile.amber{border-top-color:#e08a1e;}
 .m-tile.blue{border-top-color:#2477b3;}
+.m-tile.gray{border-top-color:#8C92AC;}
+.m-tile.orange{border-top-color:#FFA500;}
 .m-tile-label{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;
   font-family:'Barlow Condensed',sans-serif;font-weight:700;margin-bottom:.2rem;}
 .m-tile-val{font-family:'Barlow Condensed',sans-serif;font-size:1.7rem;font-weight:800;color:var(--slate);line-height:1.05;}

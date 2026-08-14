@@ -753,11 +753,15 @@ def _mov_um(df_raw, titulo, kid="x", expandir=False):
             parado = (spd == 0).mean() * 100
             vmax = spd.max()
             vmed = spd[spd > 0].mean() if (spd > 0).any() else 0
+            v_pct95 = spd[spd > 0].quantile(0.95) if (spd > 0).any() else 0
+            v_pct50 = spd[spd > 0].quantile(0.50) if (spd > 0).any() else 0
             grid(
                 tile("Vel. Máxima", f"{vmax:.0f} km/h", cc="amber"),
                 tile("Vel. Média (mov.)", f"{vmed:.1f} km/h" if vmed == vmed else "0", cc="blue"),
                 tile("% Parado", f"{parado:.1f}%", cc="green"),
                 tile("Registros", f"{len(spd):,}"),
+                tile("Vel. Percentil 50%", f"{v_pct50:.1f} km/h", cc="orange"),
+                tile("Vel. Percentil 95%", f"{v_pct95:.1f} km/h", cc="gray")
             )
             c1, c2 = st.columns(2)
             with c1:
@@ -973,6 +977,10 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
         media = base_real["_latencia_s"].mean()
         mx = base_real["_latencia_s"].max()
         pok = (base_real["_latencia_s"] <= 90).mean() * 100
+        pct50 = base_real["_latencia_s"].quantile(0.50);
+        pct95 = base_real["_latencia_s"].quantile(0.95);
+        pct99 = base_real["_latencia_s"].quantile(0.99);
+        # pct993 = base_real["_latencia_s"].quantile(0.995);
         pct_real = len(base_real) / len(dfl) * 100 if len(dfl) else 0
         pct_buf = len(dfl_buf) / len(dfl) * 100 if len(dfl) else 0
         st.caption("A latência em tempo real e a latência do buffer vêm de **dois grupos "
@@ -1001,6 +1009,18 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
                  f"entre os {len(base_real):,} registros em tempo real", cc="green",
                  help_texto="Percentual dos registros em tempo real com latência de "
                             "até 90 segundos — o limite considerado saudável."),
+            tile("Percentil 50%", fmt_duracao(pct50, decimais=True),
+                             f"entre os {len(base_real):,} registros em tempo real", cc="blue",
+                             help_texto="Tempo de reigstro em que estão concentrados os menores 50% dos dados"),
+            tile("Percentil 95%", fmt_duracao(pct95, decimais=True),
+                             f"entre os {len(base_real):,} registros em tempo real", cc="orange",
+                             help_texto="Tempo de reigstro em que estão concentrados os menores 95% dos dados"),
+            tile("Percentil 99%", fmt_duracao(pct99, decimais=True),
+                             f"entre os {len(base_real):,} registros em tempo real", cc="gray",
+                             help_texto="Tempo de reigstro em que estão concentrados os menores 99% dos dados"),
+            # tile("Percentil 99%", f"{pct993:.1f}s",
+            #                  f"entre os {len(base_real):,} registros em tempo real", cc="blue",
+            #                  help_texto="Tempo de reigstro em que estão concentrados 99,3% dos dados"),
         )
 
         if len(dfl_buf) > 0:

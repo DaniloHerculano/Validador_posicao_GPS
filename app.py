@@ -311,7 +311,7 @@ if not eh_individual:
 if not eh_individual:
   with abas[10]:
     sec("Histórico de Relatórios")
-    st.caption("Abra um teste já salvo na pasta do Google Drive, sem precisar enviar os "
+    st.caption("Abra um teste já salvo na pasta do Google Drive, sem p  recisar enviar os "
                "arquivos novamente. Cada subpasta da pasta de histórico é um teste.")
     if hist.disponivel():
         st.info("O seletor de histórico está disponível no topo da página, na seção "
