@@ -607,7 +607,7 @@ def _rede_um(df_raw, titulo, df_prec=None, kid="x", expandir=False):
                 text=op_counts.values, textposition="outside"))
             fig.update_layout(title="Registros por Operadora", showlegend=False)
             st.plotly_chart(aplica_tema(fig), width='stretch', key=f"barop_{kid}")
-        tab = pd.DataFrame({"Tecnologia": tech_counts.index, "Registros": tech_counts.values,
+        tab = pd.DataFrame({"Tecnologia": tech_counts.index, "Registros": tech_counts.values, 
             "%": (tech_counts.values/total*100).round(1)})
         st.dataframe(tab, width='stretch', hide_index=True)
         op_pct = (op_counts/total*100).round(1)
@@ -760,7 +760,7 @@ def _mov_um(df_raw, titulo, kid="x", expandir=False):
                 tile("Vel. Média (mov.)", f"{vmed:.1f} km/h" if vmed == vmed else "0", cc="blue"),
                 tile("% Parado", f"{parado:.1f}%", cc="green"),
                 tile("Registros", f"{len(spd):,}"),
-                tile("Vel. Percentil 50%", f"{v_pct50:.1f} km/h", cc="orange"),
+                tile("Vel. Percentil 50% (mediana)", f"{v_pct50:.1f} km/h", cc="orange"),
                 tile("Vel. Percentil 95%", f"{v_pct95:.1f} km/h", cc="gray")
             )
             c1, c2 = st.columns(2)
@@ -979,8 +979,8 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
         pok = (base_real["_latencia_s"] <= 90).mean() * 100
         pct50 = base_real["_latencia_s"].quantile(0.50);
         pct95 = base_real["_latencia_s"].quantile(0.95);
-        pct99 = base_real["_latencia_s"].quantile(0.99);
-        # pct993 = base_real["_latencia_s"].quantile(0.995);
+        # pct99 = base_real["_latencia_s"].quantile(0.99);
+        # pct999 = base_real["_latencia_s"].quantile(0.999);
         pct_real = len(base_real) / len(dfl) * 100 if len(dfl) else 0
         pct_buf = len(dfl_buf) / len(dfl) * 100 if len(dfl) else 0
         st.caption("A latência em tempo real e a latência do buffer vêm de **dois grupos "
@@ -1009,18 +1009,18 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
                  f"entre os {len(base_real):,} registros em tempo real", cc="green",
                  help_texto="Percentual dos registros em tempo real com latência de "
                             "até 90 segundos — o limite considerado saudável."),
-            tile("Percentil 50%", fmt_duracao(pct50, decimais=True),
+            tile("Percentil 50% (mediana)", fmt_duracao(pct50, decimais=True),
                              f"entre os {len(base_real):,} registros em tempo real", cc="blue",
                              help_texto="Tempo de reigstro em que estão concentrados os menores 50% dos dados"),
             tile("Percentil 95%", fmt_duracao(pct95, decimais=True),
                              f"entre os {len(base_real):,} registros em tempo real", cc="orange",
                              help_texto="Tempo de reigstro em que estão concentrados os menores 95% dos dados"),
-            tile("Percentil 99%", fmt_duracao(pct99, decimais=True),
-                             f"entre os {len(base_real):,} registros em tempo real", cc="gray",
-                             help_texto="Tempo de reigstro em que estão concentrados os menores 99% dos dados"),
-            # tile("Percentil 99%", f"{pct993:.1f}s",
+            # tile("Percentil 99%", fmt_duracao(pct99, decimais=True),
+            #                  f"entre os {len(base_real):,} registros em tempo real", cc="gray",
+            #                  help_texto="Tempo de reigstro em que estão concentrados os menores 99% dos dados"),
+            # tile("Percentil 99,9%", f"{pct999:.1f}s",
             #                  f"entre os {len(base_real):,} registros em tempo real", cc="blue",
-            #                  help_texto="Tempo de reigstro em que estão concentrados 99,3% dos dados"),
+            #                  help_texto="Tempo de reigstro em que estão concentrados 99,9% dos dados"),
         )
 
         if len(dfl_buf) > 0:
@@ -1040,7 +1040,7 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
                 tile("Latência Média", fmt_duracao(dfl_buf["_latencia_s"].mean()),
                      f"entre os {len(dfl_buf):,} registros do buffer", cc="amber",
                      help_texto=AJUDA_BUFFER),
-                tile("Percentil 50%", fmt_duracao(dfl_buf["_latencia_s"].quantile(0.50)),
+                tile("Percentil 50% (mediana)", fmt_duracao(dfl_buf["_latencia_s"].quantile(0.50)),
                      f"entre os {len(dfl_buf):,} registros do buffer", cc="amber"),
                 tile("Percentil 95%", fmt_duracao(dfl_buf["_latencia_s"].quantile(0.95)),
                      f"entre os {len(dfl_buf):,} registros do buffer", cc="amber"))
