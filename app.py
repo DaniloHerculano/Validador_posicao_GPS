@@ -37,18 +37,21 @@ with st.sidebar:
     st.markdown("### ⚙️ Parâmetros")
     st.markdown("---")
 
-    with st.expander("Parâmetros avançados", expanded=False):
-        tolerancia = st.number_input(
-            "Tolerância de horário (min)",
-            1, 60, 10, 1,
-            help="Janela máxima para parear referência × comparado"
-        )
+    # with st.expander("Parâmetros avançados", expanded=False):
+    #     tolerancia = st.number_input(
+    #         "Tolerância de horário (min)",
+    #         1, 60, 10, 1,
+    #         help="Janela máxima para parear referência × comparado"
+    #     )
 
-        tol_fusao = st.number_input(
-            "Tolerância de fusão CSV↔XLS (s)",
-            5, 300, 60, 5,
-            help="Janela para casar o log técnico (CSV) ao ponto de posição (XLS)"
-        )
+    #     tol_fusao = st.number_input(
+    #         "Tolerância de fusão CSV↔XLS (s)",
+    #         5, 300, 60, 5,
+    #         help="Janela para casar o log técnico (CSV) ao ponto de posição (XLS)"
+    #     )
+
+    tolerancia = 1
+    tol_fusao = 60
 
     st.markdown("**Raios de precisão (km)**")
     raio1 = st.number_input("Raio 1 (km)", value=1.0, step=0.5, min_value=0.1)
