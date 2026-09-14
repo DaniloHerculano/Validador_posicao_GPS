@@ -20,8 +20,9 @@ import pandas as pd
 
 carregar_css()
 
-# Gate de acesso — exige login antes de qualquer conteúdo
-exigir_login()
+# Gate de acesso — DESABILITADO temporariamente (acesso direto via redirecionamento externo).
+# Para reativar o login, basta descomentar a linha abaixo:
+# exigir_login()
 
 st.markdown(HELP_CSS, unsafe_allow_html=True)
 
@@ -45,8 +46,8 @@ with st.sidebar:
     raio2 = st.number_input("Raio 2 (km)", value=3.0, step=0.5, min_value=0.1)
     raio3 = st.number_input("Raio 3 (km)", value=5.0, step=0.5, min_value=0.1)
     st.markdown("---")
-    botao_sair()
-    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.11.4</span>',
+    # botao_sair()  # login desabilitado — botão de sair oculto
+    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.11.5</span>',
                 unsafe_allow_html=True)
 
 # ── AJUDA RÁPIDA ──────────────────────────────────────────────────────────────
@@ -226,7 +227,7 @@ if vazios:
 if eh_individual:
     # Modo individual: análises por peça + visão geral e mapa (sem comparação)
     abas = st.tabs(["📊 Visão Geral", "🗺 Mapa", "📶 Rede & Operadora", "🛰 Qualidade GPS",
-        "🚗 Movimento", "🔋 Bateria & Sensores", "⏱ Latência", "📋 Dados", "💾 Histórico", "❓ Como Usar"])
+        "🚗 Movimento", "🔋 Bateria", "⏱ Latência", "📋 Dados", "💾 Histórico", "❓ Como Usar"])
     vazio_df = pd.DataFrame()
     with abas[0]: g.aba_visao_geral({}, vazio_df, "", raios, dados)
     with abas[1]: g.aba_mapa_individual(dados)
@@ -252,7 +253,7 @@ if eh_individual:
             file_name=f"{nome_arquivo_seguro(sel)}.csv", mime="text/csv", key="dl_ind")
 else:
     abas = st.tabs(["📊 Visão Geral", "🗺 Mapa", "📍 Precisão GPS", "🎯 Raio do Sistema",
-        "📶 Rede & Operadora", "🛰 Qualidade GPS", "🚗 Movimento", "🔋 Bateria & Sensores", "⏱ Latência",
+        "📶 Rede & Operadora", "🛰 Qualidade GPS", "🚗 Movimento", "🔋 Bateria", "⏱ Latência",
         "📋 Dados & Export", "💾 Histórico", "❓ Como Usar"])
 
     with abas[0]: g.aba_visao_geral(resultados, df_ref, ref_nome, raios, dados)
@@ -269,16 +270,12 @@ else:
 if not eh_individual:
   with abas[9]:
     sec("Exportar Análise Completa")
-    st.caption("Excel autossuficiente — pode ser lido sem acesso à plataforma. Inclui "
-               "Resumo, Rede & Bateria, Latência & Buffer, verificação de ordem LIFO, "
-               "validação do raio do sistema, dados sincronizados por equipamento e um "
-               "Glossário com todos os termos técnicos.")
+    st.caption("Excel com Resumo, dados sincronizados por equipamento e consolidado Rede & Bateria.")
     df_resumo = st.session_state.get("df_resumo")
     cE1, cE2 = st.columns(2)
     with cE1:
         st.download_button("📥  Baixar Excel Completo (.xlsx)",
-            data=gerar_excel(df_resumo, resultados, dados, raios=raios,
-                             tolerancia=tolerancia, tol_fusao=tol_fusao),
+            data=gerar_excel(df_resumo, resultados, dados, raios=raios),
             file_name="analise_posicionamento.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="dl_excel")
