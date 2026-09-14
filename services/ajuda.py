@@ -204,18 +204,44 @@ Ao carregar os arquivos, escolha o modo:
     # ── O que cada aba mostra ──
     st.markdown("#### 📊 O que cada aba mostra")
     st.markdown("""
-| Aba | Conteúdo | Precisa de |
-|-----|----------|------------|
-| **Visão Geral** | Resumo comparativo e erro médio | XLS (posição) |
-| **Mapa** | Pontos no mapa + linhas de erro + calor | XLS (posição) |
-| **Precisão GPS** | Erro em km, % por raio, endereços de maior erro | XLS (posição) |
-| **Raio do Sistema** | % de pontos dentro do raio que o sistema informa | KML + XLS |
-| **Rede & Operadora** | 2G/3G/4G, operadora, banda/frequência, UDP/SMS | CSV (técnico) |
-| **Qualidade GPS** | Satélites, DOP, altitude | CSV (técnico) |
-| **Movimento** | Velocidade, direção, sensor | CSV + XLS |
-| **Bateria** | Nível e consumo | XLS ou CSV |
-| **Latência** | Tempo módulo→servidor, buffer | CSV (técnico) |
+| Aba | Conteúdo | Fonte dos dados |
+|-----|----------|-----------------|
+| **Visão Geral** | Panorama do teste, equipamentos e destaques por área | Todas |
+| **Mapa** | Posições no mapa, linhas de erro e círculo do raio | Posição |
+| **Precisão GPS** | Erro em km, % por raio, GPS real × estimada | Posição |
+| **Raio do Sistema** | % de pontos dentro do raio que o sistema informa | Raio (radius/KML) |
+| **Rede & Operadora** | 2G/3G/4G, operadora, banda/frequência | CSV / firmware |
+| **Qualidade GPS** | Satélites e índices de precisão (DOP) | CSV / firmware |
+| **Movimento** | Velocidade e direção | CSV / firmware |
+| **Bateria** | Nível e consumo | Qualquer fonte |
+| **Latência** | Tempo módulo→servidor, separando buffer | CSV / firmware |
 | **Histórico** | Abrir testes salvos no Google Drive | — |
+
+Lembrando: o **CSV do Gerenciamento de Firmware** já traz todas essas informações
+sozinho. As fontes do SSO (XLS/KML) cobrem posição e raio, mas não rede, satélites
+nem latência.
+""")
+
+    # ── Latência × Buffer ──
+    st.markdown("#### ⏱ Latência e Buffer — qual a diferença?")
+    st.markdown("""
+São dois conceitos distintos, fáceis de confundir:
+
+- **Latência** é o *tempo de entrega* de cada posição: a diferença entre o horário em
+  que o módulo registrou (**Data do Módulo**) e o horário em que o servidor recebeu
+  (**Data do Servidor**). Quando há sinal, é quase instantânea (poucos segundos).
+
+- **Buffer** é o que acontece quando o rastreador **perde o sinal**: ele guarda as
+  posições na memória e as envia quando o sinal volta. Como o buffer é **LIFO**
+  (*last in, first out*), ao recuperar o sinal ele envia primeiro as posições **mais
+  recentes** e depois as mais antigas — por isso a "data de servidor" desses registros
+  fica fora de ordem.
+
+Um registro que ficou no buffer terá uma "latência" de vários minutos, mas isso **não
+significa rede lenta** — significa que houve perda de sinal e os dados subiram
+atrasados. Por isso a aba **Latência** separa os dois: calcula a latência real usando
+apenas os registros transmitidos na hora, e contabiliza à parte os que vieram do
+buffer (destacados no gráfico).
 """)
 
     # ── Como o erro é medido ──
@@ -238,14 +264,43 @@ Para evitar que cada pessoa precise enviar os arquivos de novo, é possível **a
 teste já salvo** numa pasta do Google Drive. O seletor fica no topo da página, na
 seção *Importar Arquivos* → **"Abrir um teste salvo no histórico"**.
 
-Como está organizado: dentro da pasta de histórico, **cada subpasta é um teste** (com
-seus arquivos CSV / XLS / KML). Para abrir, basta selecionar o teste na lista e clicar
-em **Abrir** — o app baixa os arquivos e roda a análise automaticamente.
+**Para abrir um teste salvo:** selecione-o na lista e clique em **Abrir** — o app baixa
+os arquivos e roda a análise automaticamente. Cada subpasta da pasta de histórico é um
+teste.
 
-Para **adicionar** um novo teste ao histórico, crie uma subpasta no Drive (ex.:
-*Cliente X_Rota SP-BH_10.06-15.06*) e coloque nela os arquivos daquele teste. Na
-próxima vez que abrir o seletor (ou clicar em *Atualizar*), o novo teste aparece para
-toda a equipe.
+**Para salvar um novo teste** e disponibilizá-lo para a equipe: use o botão
+**"📁 Abrir pasta do Drive"** (no mesmo painel de histórico), crie uma **subpasta com o
+nome do teste** (ex.: *Cliente X — Rota SP-BH — 10.06 a 15.06*) e coloque nela os
+arquivos daquele teste. Na próxima vez que abrir o seletor (ou clicar em *Atualizar*),
+o teste aparece para todos.
+
+> **Permissões:** a pasta é pública para **leitura** (todos conseguem abrir os testes),
+> mas para **subir** arquivos é preciso ter acesso de edição. Caso você não consiga
+> adicionar arquivos à pasta, **solicite o acesso a Danilo Herculano**.
+""")
+
+    # ── Export / Excel ──
+    st.markdown("#### 📥 Exportação em Excel")
+    st.markdown("""
+Na aba **Dados & Export** é possível baixar um relatório completo em Excel, com:
+
+- uma aba de **Informações** (capa com data e a lista de equipamentos do teste);
+- o **Resumo** comparativo (erro médio, % dentro de cada raio);
+- uma aba por equipamento com os dados **sincronizados** (posição, erro, raio, tipo de
+  posição, rede, banda, endereço) e gráficos;
+- uma aba de **Glossário** explicando cada termo do relatório.
+
+As colunas do Excel trazem **comentários** (passe o mouse sobre o cabeçalho para ver a
+explicação), equivalentes às dicas de ajuda da plataforma.
+""")
+
+    # ── Dicas de ajuda ──
+    st.markdown("#### ℹ️ Dicas de ajuda na tela")
+    st.markdown("""
+Ao longo do app você encontra ícones e caixas de ajuda: cada **aba** tem uma breve
+explicação no topo (o que é analisado e de onde vêm os dados), e vários indicadores têm
+uma **dica ao passar o mouse**. Use-os sempre que tiver dúvida sobre o que um número
+representa.
 """)
 
     st.caption("Stoneridge Brasil · Teste de Rodagem")
