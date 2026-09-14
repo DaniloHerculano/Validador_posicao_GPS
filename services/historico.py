@@ -38,6 +38,14 @@ def _folder_id() -> str:
     return st.secrets["gdrive"]["folder_id"]
 
 
+def url_pasta() -> str:
+    """URL da pasta de histórico no Google Drive (para o usuário abrir no navegador)."""
+    try:
+        return f"https://drive.google.com/drive/folders/{_folder_id()}"
+    except Exception:
+        return ""
+
+
 def listar() -> list:
     """
     Lista as subpastas (cada uma = um teste) dentro da pasta pública.
@@ -176,3 +184,21 @@ def painel_historico(st_mod, expandido=False):
                             st.rerun()
                     except Exception as e:
                         st.error(f"Falha ao abrir: {e}")
+
+        # ── Salvar/subir testes: link para a pasta do Drive ──
+        st.markdown("---")
+        link = url_pasta()
+        if link:
+            st.markdown(
+                f"**📤 Salvar um novo teste no histórico**  \n"
+                f"Para disponibilizar um teste para toda a equipe, envie os arquivos "
+                f"para a pasta compartilhada no Google Drive, em uma **subpasta com o "
+                f"nome do teste**.  \n\n"
+                f"<a href=\"{link}\" target=\"_blank\">"
+                f"<button style=\"background:#dd0933;color:#fff;border:none;"
+                f"padding:.5rem 1rem;border-radius:7px;font-weight:700;cursor:pointer\">"
+                f"📁 Abrir pasta do Drive</button></a>",
+                unsafe_allow_html=True)
+            st.caption("⚠️ É necessário ter permissão para subir arquivos. Caso não "
+                       "consiga adicionar arquivos, solicite acesso de edição a "
+                       "**Danilo Herculano**.")
