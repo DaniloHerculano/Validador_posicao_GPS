@@ -1003,6 +1003,20 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
                             "até 90 segundos — o limite considerado saudável."),
         )
 
+        # Alerta: registros de latência muito alta marcados como "tempo real".
+        # Pode indicar que o equipamento não marcou o buffer (bufferstatus) direito.
+        LIMIAR_SUSPEITO = 300  # 5 minutos
+        suspeitos = base_real[base_real["_latencia_s"] > LIMIAR_SUSPEITO]
+        if len(suspeitos) > 0:
+            st.warning(
+                f"⚠️ **{len(suspeitos)} registro(s) em tempo real com latência acima de "
+                f"5 min** (máx {fmt_duracao(suspeitos['_latencia_s'].max())}). "
+                f"Latências tão altas normalmente são buffer (perda de sinal), mas estes "
+                f"**não estão marcados como buffer** (bufferstatus = false) neste "
+                f"equipamento. Isso costuma indicar que o firmware deste rastreador não "
+                f"preenche o status de buffer de forma confiável — então a latência média "
+                f"em tempo real acima pode estar inflada por esses pontos.")
+
         if len(dfl_buf) > 0:
             # ── Bloco 2: recuperados do buffer (bufferstatus = true) — mesma
             # estrutura visual do bloco acima, mas é um grupo de registros
@@ -1158,6 +1172,33 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
                 st.plotly_chart(aplica_tema(fig), width='stretch', key=f"buf_{kid}")
             else:
                 st.info("Sem horário para série temporal de latência.")
+
+        # ── Distribuição do atraso dos registros de buffer (faixas em minutos) ──
+        if len(dfl_buf) > 0:
+            st.markdown("**Distribuição do atraso dos registros recuperados do buffer**")
+            buf_min = dfl_buf["_latencia_s"] / 60.0
+            BUF_BINS = [0, 1, 5, 15, 30, 60, float("inf")]
+            BUF_LABELS = ["<1min", "1–5min", "5–15min", "15–30min", "30–60min", ">1h"]
+            BUF_CORES = ["#f2c744", "#f0a830", "#e8870c", "#dd6b0c", "#c23b0c", "#8c1c0c"]
+            cat_buf = pd.cut(buf_min, bins=BUF_BINS, labels=BUF_LABELS, right=False)
+            ccb = cat_buf.value_counts().reindex(BUF_LABELS).fillna(0)
+            cB1, cB2 = st.columns(2)
+            with cB1:
+                figb = go.Figure(go.Bar(x=ccb.index, y=ccb.values, marker_color=BUF_CORES,
+                    text=ccb.values.astype(int), textposition="outside"))
+                figb.update_layout(title="Buffer por Faixa de Atraso", showlegend=False)
+                st.plotly_chart(aplica_tema(figb), width='stretch', key=f"bufdist_{kid}")
+            with cB2:
+                # Atraso dos registros de buffer ao longo do tempo
+                if "datetime_module" in dfl_buf.columns:
+                    tsb2 = dfl_buf.sort_values("datetime_module")
+                    figb2 = go.Figure(go.Scatter(
+                        x=tsb2["datetime_module"], y=tsb2["_latencia_s"] / 60.0,
+                        mode="markers", marker=dict(size=8, color="#dd6b0c",
+                        symbol="triangle-up"), name="Buffer"))
+                    figb2.update_layout(title="Atraso do Buffer ao Longo do Tempo",
+                                        yaxis_title="minutos", showlegend=False)
+                    st.plotly_chart(aplica_tema(figb2), width='stretch', key=f"bufts_{kid}")
 
 
 def aba_latencia(df_ref, ref_nome, comparacao, dados):
