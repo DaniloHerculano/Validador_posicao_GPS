@@ -107,7 +107,19 @@ def analisar_buffer_lifo(df_raw: pd.DataFrame) -> dict:
         return None
     df["_buf"] = buf_mask_full.reindex(df.index).fillna(False)
     df = df.sort_values("datetime_server").reset_index(drop=True)
-    df["_ep"] = (df["_buf"] != df["_buf"].shift()).cumsum()
+
+    # Agrupa em "episódios": rajadas contínuas de registros bufferizados que
+    # chegam juntas ao servidor. Além da continuidade do bufferstatus, QUEBRA o
+    # episódio quando o datetime_module dá um salto grande (> GAP_EP) para frente,
+    # sinal de que começou outra recuperação de sinal (outra perda), evitando
+    # misturar perdas distintas num só episódio — o que gerava falsos
+    # "fora de ordem" na verificação LIFO.
+    GAP_EP = pd.Timedelta(minutes=20)
+    nova_rajada = df["_buf"] != df["_buf"].shift()
+    dm_prev = df["datetime_module"].shift()
+    # dentro de um trecho de buffer, se o módulo "pula para frente" muito, separa
+    salto_para_frente = df["_buf"] & (df["datetime_module"] - dm_prev > GAP_EP)
+    df["_ep"] = (nova_rajada | salto_para_frente.fillna(False)).cumsum()
 
     episodios = []
     registros_detalhe = []
