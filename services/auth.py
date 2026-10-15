@@ -11,7 +11,7 @@ _USUARIO = "validapst"
 _SENHA = "123456"
 
 # Versão corrente do sistema (exibida na tela de login)
-VERSAO = "0.11.10"
+VERSAO = "0.12"
 
 
 def _logo_b64() -> str:
