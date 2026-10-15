@@ -211,11 +211,23 @@ h1,h2,h3,h4{font-family:'Barlow Condensed',sans-serif!important;font-weight:700!
 
 /* Tabs */
 .stTabs [data-baseweb="tab-list"]{background:var(--surface);gap:4px;padding:5px;border-radius:9px;
-  border:1px solid var(--border);flex-wrap:wrap;box-shadow:0 1px 3px rgba(44,57,70,.05);
-  position:sticky;top:2.875rem;z-index:999;}
+  border:1px solid var(--border);flex-wrap:wrap;box-shadow:0 1px 3px rgba(44,57,70,.05);}
 .stTabs [data-baseweb="tab"]{background:transparent;color:var(--muted);border-radius:6px;
   font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.9rem;letter-spacing:.02em;padding:.3rem .8rem;}
 .stTabs [aria-selected="true"]{background:var(--red)!important;color:#fff!important;}
+
+/* Menu de navegação na sidebar (radio como lista de abas verticais) */
+section[data-testid="stSidebar"] div[role="radiogroup"]{gap:2px;}
+section[data-testid="stSidebar"] div[role="radiogroup"] label{
+  padding:.45rem .7rem;border-radius:7px;cursor:pointer;transition:background .12s;
+  font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1rem;letter-spacing:.01em;
+  width:100%;margin:0;}
+section[data-testid="stSidebar"] div[role="radiogroup"] label:hover{background:rgba(221,9,51,.07);}
+/* esconde a bolinha do radio, deixando só o texto como item de menu */
+section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child{display:none;}
+/* item selecionado destacado */
+section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked){
+  background:var(--red);color:#fff;}
 
 /* Expanders (painéis por rastreador) */
 .streamlit-expanderHeader,details>summary{font-family:'Barlow Condensed',sans-serif!important;font-weight:700!important;}
