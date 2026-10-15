@@ -43,6 +43,13 @@ def _escreve_df(ws, df, start_row=1):
     for r in dataframe_to_rows(df, index=False, header=True):
         ws.append(r)
     _estiliza_header(ws, len(df.columns), start_row)
+    # zebra: linhas pares com fundo suave
+    zebra = PatternFill("solid", fgColor="F3F6FA")
+    ncols = len(df.columns)
+    for ri in range(start_row + 1, start_row + 1 + len(df)):
+        if (ri - start_row) % 2 == 0:
+            for ci in range(1, ncols + 1):
+                ws.cell(row=ri, column=ci).fill = zebra
     # largura automática simples
     for i, col in enumerate(df.columns, 1):
         maxlen = max([len(str(col))] + [len(str(v)) for v in df[col].head(50)])
@@ -186,10 +193,16 @@ def gerar_excel(df_resumo, resultados: dict, dados: list,
     # ── Aba CAPA / INFORMAÇÕES ──
     wscapa = wb.active
     wscapa.title = "Informações"
-    wscapa["A1"] = "TESTE DE RODAGEM — Relatório de Análise"
-    wscapa["A1"].font = Font(bold=True, size=16, color=C_SLATE)
+    # Faixa (hero) escura no topo, estilo plataforma
+    for col in range(1, 10):
+        wscapa.cell(row=1, column=col).fill = PatternFill("solid", fgColor=C_SLATE)
+        wscapa.cell(row=2, column=col).fill = PatternFill("solid", fgColor=C_SLATE)
+    wscapa.row_dimensions[1].height = 26
+    wscapa.row_dimensions[2].height = 18
+    wscapa["A1"] = "TESTE DE RODAGEM"
+    wscapa["A1"].font = Font(bold=True, size=18, color="FFFFFF")
     wscapa["A2"] = "Análise comparativa GPS Real × Posição Estimada · Stoneridge Brasil"
-    wscapa["A2"].font = Font(size=11, color=C_RED, bold=True)
+    wscapa["A2"].font = Font(size=10, color="E6ECF2", italic=True)
     wscapa["A4"] = "Gerado em:"
     wscapa["B4"] = _dt.datetime.now().strftime("%d/%m/%Y %H:%M")
     wscapa["A4"].font = Font(bold=True)
