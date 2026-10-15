@@ -152,3 +152,20 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
 - **Tabela de operadoras completa e corrigida** (base oficial MCC/MNC Brasil): adicionadas Oi, Algar, Nextel, Brasil Telecom, Sercomtel e diversas MVNOs; corrigidos códigos que estavam errados (72406 era Vivo e estava como TIM; 72431 era Oi e estava como Vivo; 72432 era Algar; 72454 é Conecta). Reduz drasticamente os "Desconhecido".
 - Novo rótulo **"Sem Operadora"** para o código nulo 00000 (modem sem registro fixado), distinto de "Desconhecido" (código não mapeado).
 - Aba Rede: explicação do que significa **Sem Sinal**, **Sem Operadora** e **Desconhecido**.
+
+## v0.11.6
+(Baseada na versão de 24/07 que contém glossário no Excel, tooltips de ajuda e análise de buffer LIFO.)
+- **Login desabilitado** temporariamente (acesso direto, por redirecionamento externo). Reativável descomentando `exigir_login()` no app.py.
+- Histórico: botão **"Abrir pasta do Drive"** para subir novos testes, com aviso de solicitar acesso de edição a **Danilo Herculano**.
+
+## v0.11.7
+- "Como Usar" atualizado: seção de **Histórico** agora explica o botão "Abrir pasta do Drive" e a necessidade de solicitar acesso de edição a Danilo Herculano; nova seção sobre a **exportação em Excel** (capa, resumo, glossário, comentários nas colunas); nova seção **Latência × Buffer** explicando a diferença e o comportamento LIFO; tabela de abas atualizada para o fluxo do arquivo único; seção de dicas de ajuda na tela.
+
+## v0.11.8
+- Menu de abas **fixo no topo** (sticky) — não rola junto com a página.
+- Aba Latência: novo **gráfico de distribuição do buffer** (faixas de atraso em minutos) + série temporal do atraso do buffer, complementando o gráfico de tempo real.
+- Aba Latência: **alerta** quando há registros de latência muito alta (>5min) marcados como "tempo real" — sinaliza equipamentos cujo firmware não preenche o bufferstatus de forma confiável (ex.: alguns RI130), evitando interpretar latência média inflada como problema de rede.
+
+## v0.11.9
+- **Navegação movida para a sidebar esquerda** (menu vertical), substituindo as abas horizontais. Como a sidebar é fixa, o menu não rola mais junto com a página — resolve o problema do menu sumindo ao rolar.
+- **Parâmetros** (tolerâncias e raios) agrupados num expander na própria sidebar, liberando a área principal.
