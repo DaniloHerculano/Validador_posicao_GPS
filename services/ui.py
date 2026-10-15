@@ -211,7 +211,8 @@ h1,h2,h3,h4{font-family:'Barlow Condensed',sans-serif!important;font-weight:700!
 
 /* Tabs */
 .stTabs [data-baseweb="tab-list"]{background:var(--surface);gap:4px;padding:5px;border-radius:9px;
-  border:1px solid var(--border);flex-wrap:wrap;box-shadow:0 1px 3px rgba(44,57,70,.05);}
+  border:1px solid var(--border);flex-wrap:wrap;box-shadow:0 1px 3px rgba(44,57,70,.05);
+  position:sticky;top:2.875rem;z-index:999;}
 .stTabs [data-baseweb="tab"]{background:transparent;color:var(--muted);border-radius:6px;
   font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.9rem;letter-spacing:.02em;padding:.3rem .8rem;}
 .stTabs [aria-selected="true"]{background:var(--red)!important;color:#fff!important;}
