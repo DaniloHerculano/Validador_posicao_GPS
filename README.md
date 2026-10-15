@@ -169,3 +169,7 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
 ## v0.11.9
 - **Navegação movida para a sidebar esquerda** (menu vertical), substituindo as abas horizontais. Como a sidebar é fixa, o menu não rola mais junto com a página — resolve o problema do menu sumindo ao rolar.
 - **Parâmetros** (tolerâncias e raios) agrupados num expander na própria sidebar, liberando a área principal.
+
+## v0.11.10
+- Aba Latência: **painel-resumo em destaque** no topo (Total / Em tempo real / Recuperados do buffer, com % e cor por severidade) + alerta quando o buffer passa de 30% — atende ao pedido de destacar a quantidade de buffer, antes só no texto.
+- **Correção no agrupamento de episódios de buffer (LIFO):** o episódio agora é quebrado quando o datetime_module dá um salto > 20min, separando perdas de sinal distintas que chegavam coladas ao servidor. Isso elimina falsos "fora de ordem" (ex.: episódio que misturava recuperações de 11h, 12h e 13h e aparecia como 85,7% LIFO, quando cada recuperação isolada é 100% LIFO).
