@@ -975,6 +975,23 @@ def _lat_um(df_raw, titulo, kid="x", expandir=False):
         pok = (base_real["_latencia_s"] <= 90).mean() * 100
         pct_real = len(base_real) / len(dfl) * 100 if len(dfl) else 0
         pct_buf = len(dfl_buf) / len(dfl) * 100 if len(dfl) else 0
+
+        # ── Painel-resumo: tempo real × buffer em destaque ──
+        cc_buf = "" if len(dfl_buf) == 0 else ("green" if pct_buf < 10
+                 else ("amber" if pct_buf < 30 else "red"))
+        grid(
+            tile("Total de registros", f"{len(dfl):,}", "com latência válida", cc="blue"),
+            tile("Em tempo real", f"{len(base_real):,}", f"{pct_real:.1f}% do total",
+                 cc="green"),
+            tile("Recuperados do buffer", f"{len(dfl_buf):,}", f"{pct_buf:.1f}% do total",
+                 cc=cc_buf),
+        )
+        if len(dfl_buf) > 0 and pct_buf >= 30:
+            st.warning(f"⚠️ Este equipamento teve **{pct_buf:.0f}% dos registros "
+                       f"recuperados do buffer** — indica perda de sinal significativa "
+                       f"durante o teste. A transmissão em tempo real (bloco verde) segue "
+                       f"sendo a medida real da velocidade de envio.")
+
         st.caption("A latência em tempo real e a latência do buffer vêm de **dois grupos "
                    "diferentes de registros** — por isso os valores abaixo não são "
                    "comparáveis entre si, cada bloco fala só do seu próprio grupo.")
