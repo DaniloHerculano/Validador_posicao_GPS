@@ -35,19 +35,21 @@ st.markdown("""
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     logo_sidebar()
-    st.markdown("### ⚙️ Parâmetros")
-    st.markdown("---")
-    tolerancia = st.number_input("Tolerância de horário (min)", 1, 60, 10, 1,
-        help="Janela máxima para parear referência × comparado")
-    tol_fusao = st.number_input("Tolerância de fusão CSV↔XLS (s)", 5, 300, 60, 5,
-        help="Janela para casar o log técnico (CSV) ao ponto de posição (XLS)")
-    st.markdown("**Raios de precisão (km)**")
-    raio1 = st.number_input("Raio 1 (km)", value=1.0, step=0.5, min_value=0.1)
-    raio2 = st.number_input("Raio 2 (km)", value=3.0, step=0.5, min_value=0.1)
-    raio3 = st.number_input("Raio 3 (km)", value=5.0, step=0.5, min_value=0.1)
+    # Espaço reservado para o MENU DE NAVEGAÇÃO (preenchido após a análise)
+    nav_placeholder = st.container()
+
+    with st.expander("⚙️ Parâmetros", expanded=False):
+        tolerancia = st.number_input("Tolerância de horário (min)", 1, 60, 10, 1,
+            help="Janela máxima para parear referência × comparado")
+        tol_fusao = st.number_input("Tolerância de fusão CSV↔XLS (s)", 5, 300, 60, 5,
+            help="Janela para casar o log técnico (CSV) ao ponto de posição (XLS)")
+        st.markdown("**Raios de precisão (km)**")
+        raio1 = st.number_input("Raio 1 (km)", value=1.0, step=0.5, min_value=0.1)
+        raio2 = st.number_input("Raio 2 (km)", value=3.0, step=0.5, min_value=0.1)
+        raio3 = st.number_input("Raio 3 (km)", value=5.0, step=0.5, min_value=0.1)
     st.markdown("---")
     # botao_sair()  # login desabilitado — botão de sair oculto
-    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.11.8</span>',
+    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.11.9</span>',
                 unsafe_allow_html=True)
 
 # ── AJUDA RÁPIDA ──────────────────────────────────────────────────────────────
@@ -223,52 +225,24 @@ if vazios:
     st.warning("Sem sincronização para: " + ", ".join(vazios) +
                ". Verifique se há sobreposição de horário ou aumente a tolerância.")
 
-# ── ABAS ──────────────────────────────────────────────────────────────────────
-if eh_individual:
-    # Modo individual: análises por peça + visão geral e mapa (sem comparação)
-    abas = st.tabs(["📊 Visão Geral", "🗺 Mapa", "📶 Rede & Operadora", "🛰 Qualidade GPS",
-        "🚗 Movimento", "🔋 Bateria & Sensores", "⏱ Latência", "📋 Dados", "💾 Histórico", "❓ Como Usar"])
-    vazio_df = pd.DataFrame()
-    with abas[0]: g.aba_visao_geral({}, vazio_df, "", raios, dados)
-    with abas[1]: g.aba_mapa_individual(dados)
-    with abas[2]: g.aba_rede({}, vazio_df, "", [], dados)
-    with abas[3]: g.aba_qualidade_gps(vazio_df, "", [], dados)
-    with abas[4]: g.aba_movimento(vazio_df, "", [], dados)
-    with abas[5]: g.aba_bateria(vazio_df, "", [], dados)
-    with abas[6]: g.aba_latencia(vazio_df, "", [], dados)
-    with abas[9]: render_ajuda()
-    with abas[8]:
-        sec("Histórico de Relatórios")
-        st.caption("O seletor de histórico está no topo da página (seção Importar Arquivos).")
-    with abas[7]:
-        sec("Dados por Equipamento")
-        sel = st.selectbox("Equipamento", [d["arquivo"] for d in dados], key="sel_ind")
-        item = next(d for d in dados if d["arquivo"] == sel)
-        cols = [c for c in item["df"].columns if not c.startswith("_")]
-        st.dataframe(item["df"][cols].head(2000), width='stretch', hide_index=True)
-        st.caption(f"Fonte: {item['fonte']} · até 2000 de {len(item['df'])} registros · "
-                   f"PIN {item['pin']} · Tipo: {item['tipo']}")
-        st.download_button("📥 Baixar CSV deste equipamento",
-            data=item["df"][cols].to_csv(index=False).encode("utf-8"),
-            file_name=f"{nome_arquivo_seguro(sel)}.csv", mime="text/csv", key="dl_ind")
-else:
-    abas = st.tabs(["📊 Visão Geral", "🗺 Mapa", "📍 Precisão GPS", "🎯 Raio do Sistema",
-        "📶 Rede & Operadora", "🛰 Qualidade GPS", "🚗 Movimento", "🔋 Bateria & Sensores", "⏱ Latência",
-        "📋 Dados & Export", "💾 Histórico", "❓ Como Usar"])
+# ── NAVEGAÇÃO (menu na sidebar) + SEÇÕES ──────────────────────────────────────
+vazio_df = pd.DataFrame()
 
-    with abas[0]: g.aba_visao_geral(resultados, df_ref, ref_nome, raios, dados)
-    with abas[1]: g.aba_mapa(resultados, df_ref, ref_nome)
-    with abas[2]: g.aba_precisao(resultados, raios)
-    with abas[3]: g.aba_raio_sistema(resultados)
-    with abas[4]: g.aba_rede(resultados, df_ref, ref_nome, comparacao, dados)
-    with abas[5]: g.aba_qualidade_gps(df_ref, ref_nome, comparacao, dados)
-    with abas[6]: g.aba_movimento(df_ref, ref_nome, comparacao, dados)
-    with abas[7]: g.aba_bateria(df_ref, ref_nome, comparacao, dados)
-    with abas[8]: g.aba_latencia(df_ref, ref_nome, comparacao, dados)
-    with abas[11]: render_ajuda()
 
-if not eh_individual:
-  with abas[9]:
+def _secao_dados_individual():
+    sec("Dados por Equipamento")
+    sel = st.selectbox("Equipamento", [d["arquivo"] for d in dados], key="sel_ind")
+    item = next(d for d in dados if d["arquivo"] == sel)
+    cols = [c for c in item["df"].columns if not c.startswith("_")]
+    st.dataframe(item["df"][cols].head(2000), width='stretch', hide_index=True)
+    st.caption(f"Fonte: {item['fonte']} · até 2000 de {len(item['df'])} registros · "
+               f"PIN {item['pin']} · Tipo: {item['tipo']}")
+    st.download_button("📥 Baixar CSV deste equipamento",
+        data=item["df"][cols].to_csv(index=False).encode("utf-8"),
+        file_name=f"{nome_arquivo_seguro(sel)}.csv", mime="text/csv", key="dl_ind")
+
+
+def _secao_export():
     sec("Exportar Análise Completa")
     st.caption("Excel autossuficiente — pode ser lido sem acesso à plataforma. Inclui "
                "Resumo, Rede & Bateria, Latência & Buffer, verificação de ordem LIFO, "
@@ -308,9 +282,8 @@ if not eh_individual:
     st.dataframe(item["df"][cols].head(1000), width='stretch', hide_index=True)
     st.caption(f"Fonte: {item['fonte']} · até 1000 de {len(item['df'])} registros · PIN {item['pin']}")
 
-# ── ABA HISTÓRICO ─────────────────────────────────────────────────────────────
-if not eh_individual:
-  with abas[10]:
+
+def _secao_historico():
     sec("Histórico de Relatórios")
     st.caption("Abra um teste já salvo na pasta do Google Drive, sem precisar enviar os "
                "arquivos novamente. Cada subpasta da pasta de histórico é um teste.")
@@ -331,3 +304,44 @@ if not eh_individual:
             "Para ativar, configure em *Settings → Secrets* no Streamlit Cloud:\n"
             "```toml\n[gdrive]\napi_key = \"SUA_API_KEY\"\nfolder_id = \"ID_DA_PASTA\"\n```\n"
             "A pasta e suas subpastas devem estar com acesso **\"qualquer pessoa com o link\"**.")
+
+
+# Monta a lista de seções conforme o modo
+if eh_individual:
+    secoes = {
+        "📊 Visão Geral": lambda: g.aba_visao_geral({}, vazio_df, "", raios, dados),
+        "🗺 Mapa": lambda: g.aba_mapa_individual(dados),
+        "📶 Rede & Operadora": lambda: g.aba_rede({}, vazio_df, "", [], dados),
+        "🛰 Qualidade GPS": lambda: g.aba_qualidade_gps(vazio_df, "", [], dados),
+        "🚗 Movimento": lambda: g.aba_movimento(vazio_df, "", [], dados),
+        "🔋 Bateria & Sensores": lambda: g.aba_bateria(vazio_df, "", [], dados),
+        "⏱ Latência": lambda: g.aba_latencia(vazio_df, "", [], dados),
+        "📋 Dados": _secao_dados_individual,
+        "💾 Histórico": _secao_historico,
+        "❓ Como Usar": render_ajuda,
+    }
+else:
+    secoes = {
+        "📊 Visão Geral": lambda: g.aba_visao_geral(resultados, df_ref, ref_nome, raios, dados),
+        "🗺 Mapa": lambda: g.aba_mapa(resultados, df_ref, ref_nome),
+        "📍 Precisão GPS": lambda: g.aba_precisao(resultados, raios),
+        "🎯 Raio do Sistema": lambda: g.aba_raio_sistema(resultados),
+        "📶 Rede & Operadora": lambda: g.aba_rede(resultados, df_ref, ref_nome, comparacao, dados),
+        "🛰 Qualidade GPS": lambda: g.aba_qualidade_gps(df_ref, ref_nome, comparacao, dados),
+        "🚗 Movimento": lambda: g.aba_movimento(df_ref, ref_nome, comparacao, dados),
+        "🔋 Bateria & Sensores": lambda: g.aba_bateria(df_ref, ref_nome, comparacao, dados),
+        "⏱ Latência": lambda: g.aba_latencia(df_ref, ref_nome, comparacao, dados),
+        "📋 Dados & Export": _secao_export,
+        "💾 Histórico": _secao_historico,
+        "❓ Como Usar": render_ajuda,
+    }
+
+# Menu de navegação na sidebar (fixo, não rola com a página)
+with nav_placeholder:
+    st.markdown("### 🧭 Navegação")
+    escolha = st.radio("Seção", list(secoes.keys()), label_visibility="collapsed",
+                       key="nav_secao")
+    st.markdown("---")
+
+# Renderiza a seção escolhida na área principal
+secoes[escolha]()
