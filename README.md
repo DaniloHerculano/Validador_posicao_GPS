@@ -173,3 +173,10 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
 ## v0.11.10
 - Aba Latência: **painel-resumo em destaque** no topo (Total / Em tempo real / Recuperados do buffer, com % e cor por severidade) + alerta quando o buffer passa de 30% — atende ao pedido de destacar a quantidade de buffer, antes só no texto.
 - **Correção no agrupamento de episódios de buffer (LIFO):** o episódio agora é quebrado quando o datetime_module dá um salto > 20min, separando perdas de sinal distintas que chegavam coladas ao servidor. Isso elimina falsos "fora de ordem" (ex.: episódio que misturava recuperações de 11h, 12h e 13h e aparecia como 85,7% LIFO, quando cada recuperação isolada é 100% LIFO).
+
+## v0.12
+- **Visão Geral enriquecida:** nova seção "Destaques" com melhor/pior equipamento em precisão, melhor no raio do sistema e maior perda de sinal (buffer).
+- **Relatório PDF** com o visual da plataforma (hero, cards, tabelas e barras no estilo Stoneridge) — ideal para apresentar/compartilhar. Gerado via weasyprint (requer packages.txt no deploy).
+- **Excel formatado:** capa com faixa (hero) escura estilo plataforma e zebra nas tabelas; mantém as abas de Resumo, Rede & Bateria, Latência & Buffer, Buffer LIFO, Raio do Sistema, sincronização por equipamento e Glossário.
+- Aba Dados & Export reorganizada com três opções lado a lado: PDF, Excel e CSV (também no modo individual).
+- Novos arquivos de deploy: packages.txt (libs de sistema do weasyprint) e weasyprint no requirements.
