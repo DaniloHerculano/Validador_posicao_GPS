@@ -64,6 +64,10 @@ def aba_visao_geral(resultados, df_ref, ref_nome, raios, dados=None):
                  cc="green" if (erro_medio_global or 9) < raio2 else "amber"),
         )
 
+    # ───────────────────────── Destaques (melhor / pior) ─────────────────────────
+    if not eh_individual and resultados:
+        _destaques_melhor_pior(resultados, dados, _dtec, raio2)
+
     # ───────────────────────── Tabela de equipamentos ─────────────────────────
     sec("Equipamentos do Teste")
     if dados:
@@ -146,6 +150,53 @@ def aba_visao_geral(resultados, df_ref, ref_nome, raios, dados=None):
 
     # ───────────────────────── Destaques de cada área ─────────────────────────
     _destaques_areas(dados, _dtec)
+
+
+def _destaques_melhor_pior(resultados, dados, _dtec, raio2):
+    """Cards de destaque: melhor/pior em precisão, raio do sistema e buffer."""
+    sec("Destaques")
+    # Precisão: menor e maior erro médio
+    erro_por_eq = {}
+    raio_por_eq = {}
+    for nome, df in resultados.items():
+        d = df["distancia_km"].dropna()
+        if len(d):
+            erro_por_eq[nome] = d.mean()
+        if "dentro_raio" in df.columns:
+            val = df.dropna(subset=["dentro_raio"])
+            if len(val):
+                raio_por_eq[nome] = val["dentro_raio"].mean() * 100
+
+    def _curto(nome):
+        return nome.split("_GNSS")[0] if "_GNSS" in nome else nome[:22]
+
+    cards = []
+    if erro_por_eq:
+        melhor = min(erro_por_eq, key=erro_por_eq.get)
+        pior = max(erro_por_eq, key=erro_por_eq.get)
+        cards.append(tile("🏆 Melhor precisão", _curto(melhor),
+                          f"erro médio {erro_por_eq[melhor]:.3f} km", cc="green"))
+        if pior != melhor:
+            cards.append(tile("⚠️ Pior precisão", _curto(pior),
+                              f"erro médio {erro_por_eq[pior]:.3f} km", cc="red"))
+    if raio_por_eq:
+        melhor_r = max(raio_por_eq, key=raio_por_eq.get)
+        cards.append(tile("🎯 Melhor no raio do sistema", _curto(melhor_r),
+                          f"{raio_por_eq[melhor_r]:.1f}% dentro do raio", cc="green"))
+    # Buffer: quem teve mais perda de sinal
+    buf_por_eq = {}
+    for d in dados:
+        dtec = _dtec(d)
+        if dtec is not None and "_buffer_bool" in dtec.columns and len(dtec):
+            frac = dtec["_buffer_bool"].fillna(False).mean() * 100
+            if frac > 0:
+                buf_por_eq[d["arquivo"]] = frac
+    if buf_por_eq:
+        pior_buf = max(buf_por_eq, key=buf_por_eq.get)
+        cards.append(tile("📡 Mais perda de sinal (buffer)", _curto(pior_buf),
+                          f"{buf_por_eq[pior_buf]:.1f}% dos registros", cc="amber"))
+    if cards:
+        grid(*cards)
 
 
 def _destaques_areas(dados, _dtec):
