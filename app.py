@@ -230,6 +230,31 @@ vazio_df = pd.DataFrame()
 
 
 def _secao_dados_individual():
+    sec("Exportar")
+    st.caption("O **PDF** reproduz o visual da plataforma; o **Excel** traz os dados "
+               "formatados de cada peça.")
+    cX1, cX2 = st.columns(2)
+    with cX1:
+        if st.button("📄 Gerar PDF", key="btn_pdf_ind", width='stretch'):
+            try:
+                from services.relatorio_pdf import gerar_pdf
+                with st.spinner("Gerando PDF..."):
+                    st.session_state["pdf_bytes"] = gerar_pdf(
+                        {}, dados, raios, ref_nome="", eh_individual=True)
+            except Exception as e:
+                st.error(f"Falha ao gerar o PDF: {e}")
+        if st.session_state.get("pdf_bytes"):
+            st.download_button("📥 Baixar PDF", data=st.session_state["pdf_bytes"],
+                file_name="relatorio_teste_rodagem.pdf", mime="application/pdf",
+                key="dl_pdf_ind", width='stretch')
+    with cX2:
+        st.download_button("📊 Baixar Excel (.xlsx)",
+            data=gerar_excel(None, {}, dados, raios=raios,
+                             tolerancia=tolerancia, tol_fusao=tol_fusao),
+            file_name="analise_posicionamento.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="dl_excel_ind", width='stretch')
+
     sec("Dados por Equipamento")
     sel = st.selectbox("Equipamento", [d["arquivo"] for d in dados], key="sel_ind")
     item = next(d for d in dados if d["arquivo"] == sel)
@@ -243,25 +268,56 @@ def _secao_dados_individual():
 
 
 def _secao_export():
-    sec("Exportar Análise Completa")
-    st.caption("Excel autossuficiente — pode ser lido sem acesso à plataforma. Inclui "
-               "Resumo, Rede & Bateria, Latência & Buffer, verificação de ordem LIFO, "
-               "validação do raio do sistema, dados sincronizados por equipamento e um "
-               "Glossário com todos os termos técnicos.")
+    sec("Exportar Análise")
+    st.caption("Escolha o formato. O **PDF** reproduz o visual da plataforma (ideal para "
+               "apresentar e compartilhar). O **Excel** é formatado com cores e gráficos "
+               "(ideal para trabalhar os dados). O **CSV** traz só a tabela-resumo.")
     df_resumo = st.session_state.get("df_resumo")
-    cE1, cE2 = st.columns(2)
+
+    cE1, cE2, cE3 = st.columns(3)
+
+    # ── PDF (visual do site) ──
     with cE1:
-        st.download_button("📥  Baixar Excel Completo (.xlsx)",
+        st.markdown("**📄 Relatório PDF**")
+        st.caption("Com o visual da plataforma.")
+        if st.button("Gerar PDF", key="btn_pdf", width='stretch'):
+            try:
+                from services.relatorio_pdf import gerar_pdf
+                with st.spinner("Gerando PDF..."):
+                    pdf_bytes = gerar_pdf(resultados, dados, raios,
+                                          ref_nome=ref_nome if not eh_individual else "",
+                                          eh_individual=eh_individual,
+                                          tolerancia=tolerancia, tol_fusao=tol_fusao)
+                st.session_state["pdf_bytes"] = pdf_bytes
+            except Exception as e:
+                st.error(f"Falha ao gerar o PDF: {e}")
+        if st.session_state.get("pdf_bytes"):
+            st.download_button("📥 Baixar PDF", data=st.session_state["pdf_bytes"],
+                file_name="relatorio_teste_rodagem.pdf", mime="application/pdf",
+                key="dl_pdf", width='stretch')
+
+    # ── Excel formatado ──
+    with cE2:
+        st.markdown("**📊 Excel Completo**")
+        st.caption("Cores, gráficos e glossário.")
+        st.download_button("📥 Baixar Excel (.xlsx)",
             data=gerar_excel(df_resumo, resultados, dados, raios=raios,
                              tolerancia=tolerancia, tol_fusao=tol_fusao),
             file_name="analise_posicionamento.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="dl_excel")
-    with cE2:
+            key="dl_excel", width='stretch')
+
+    # ── CSV resumo ──
+    with cE3:
+        st.markdown("**📋 Resumo CSV**")
+        st.caption("Só a tabela-resumo.")
         if df_resumo is not None:
-            st.download_button("📥  Baixar Resumo (.csv)",
+            st.download_button("📥 Baixar CSV",
                 data=df_resumo.to_csv(index=False).encode("utf-8"),
-                file_name="resumo_posicionamento.csv", mime="text/csv", key="dl_csv")
+                file_name="resumo_posicionamento.csv", mime="text/csv", key="dl_csv",
+                width='stretch')
+        else:
+            st.caption("— indisponível —")
 
     sec("Registros Sincronizados")
     for nome, df in resultados.items():
