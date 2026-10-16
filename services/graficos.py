@@ -632,20 +632,20 @@ def _rede_um(df_raw, titulo, df_prec=None, kid="x", expandir=False):
         op_counts = df_raw["_operadora"].value_counts()
         c4 = df_raw["_tech"].str.startswith("4G").sum()
         c2 = df_raw["_tech"].str.startswith("2G").sum()
-        cn = (df_raw["_tech"] == "Sem rede").sum()
+        cn = (df_raw["_tech"] == "Indefinido").sum()
         # Base única = todos os registros técnicos para consistência dos percentuais
         p4 = round(c4/total*100, 1) if total else 0
         p2 = round(c2/total*100, 1) if total else 0
         pn = round(cn/total*100, 1) if total else 0
         st.caption(f"Base: {total:,} registros técnicos (CSV). Percentuais sobre o total. "
-                   "\"Sem rede\" = registro sem conexão celular no momento (campo de rede "
-                   "vazio ou NO SERVICE).")
+                   "\"Indefinido\" = registro sem informação de rede no momento (campo de "
+                   "rede vazio ou NO SERVICE).")
         # Percentual em destaque (valor grande) e a quantidade como subtítulo
         grid(
             tile("Total de registros", f"{total:,}", "100%", "blue"),
             tile("4G", f"{p4}%", f"{c4:,} registros", "green"),
             tile("2G", f"{p2}%", f"{c2:,} registros", "amber"),
-            tile("Sem rede", f"{pn}%", f"{cn:,} registros"),
+            tile("Indefinido", f"{pn}%", f"{cn:,} registros"),
         )
         c1, c2c = st.columns(2)
         with c1:
@@ -711,8 +711,10 @@ def aba_rede(resultados, df_ref, ref_nome, comparacao, dados):
     explicacao("Analisa **como o rastreador se comunica**: tecnologia (2G / 4G), "
                "operadora e a **banda/frequência** do modem (GSM850/900/1800/1900, "
                "LTE B3/B7/B28...). Vem do CSV técnico completo.<br><br>"
-               "• <b>Sem rede</b> (na tecnologia): o registro não tinha rede alguma — o "
-               "modem estava sem cobertura (campo de rede vazio ou \"NO SERVICE\").<br>"
+               "• <b>Indefinido</b> (na tecnologia): o registro subiu sem informação de "
+               "rede no momento — campo de rede vazio ou \"NO SERVICE\" (comum, por "
+               "exemplo, em registros recuperados do buffer, que sobem sem o dado da "
+               "ERB).<br>"
                "• <b>Sem Operadora</b> (na operadora): o modem reportou código nulo "
                "(00000), típico de quando está tentando se registrar mas ainda não fixou "
                "numa operadora.<br>"
