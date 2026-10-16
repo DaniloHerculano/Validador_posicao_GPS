@@ -1,0 +1,404 @@
+"""
+app.py — Validador de Posicionamento (Stoneridge Brasil)
+Aceita CSV (log técnico) e XLS (posição estimada convertida) por equipamento,
+funde as duas fontes e gera análise comparativa completa.
+"""
+import streamlit as st
+
+st.set_page_config(page_title="Validador de Posicionamento", page_icon="📡",
+                   layout="wide", initial_sidebar_state="expanded")
+
+from services.ui import carregar_css, sec, badge, logo_sidebar
+from services.config import SR_RED
+from services.loader import consolidar_equipamento, nome_base, extrair_pin, extrair_modelo
+from services.analise import sincronizar
+from services.export import gerar_excel, nome_arquivo_seguro
+from services.ajuda import render_ajuda, HELP_CSS
+from services.auth import exigir_login, botao_sair
+from services import graficos as g
+import pandas as pd
+
+carregar_css()
+
+# Gate de acesso — DESABILITADO temporariamente (acesso direto via redirecionamento externo).
+# Para reativar o login, basta descomentar a linha abaixo:
+# exigir_login()
+
+st.markdown(HELP_CSS, unsafe_allow_html=True)
+
+st.markdown("""
+<div class="hero-wrap"><div class="hero-bar"></div><div>
+<div class="hero-title">TESTE DE RODAGEM</div>
+<div class="hero-sub">Análise comparativa GPS Real × Posição Estimada · Stoneridge Brasil</div>
+</div></div>""", unsafe_allow_html=True)
+
+# ── SIDEBAR ───────────────────────────────────────────────────────────────────
+with st.sidebar:
+    logo_sidebar()
+    # Espaço reservado para o MENU DE NAVEGAÇÃO (preenchido após a análise)
+    nav_placeholder = st.container()
+
+    with st.expander("⚙️ Parâmetros", expanded=False):
+        tolerancia = st.number_input("Tolerância de horário (min)", 1, 60, 10, 1,
+            help="Janela máxima para parear referência × comparado")
+        tol_fusao = st.number_input("Tolerância de fusão CSV↔XLS (s)", 5, 300, 60, 5,
+            help="Janela para casar o log técnico (CSV) ao ponto de posição (XLS)")
+        st.markdown("**Raios de precisão (km)**")
+        raio1 = st.number_input("Raio 1 (km)", value=1.0, step=0.5, min_value=0.1)
+        raio2 = st.number_input("Raio 2 (km)", value=3.0, step=0.5, min_value=0.1)
+        raio3 = st.number_input("Raio 3 (km)", value=5.0, step=0.5, min_value=0.1)
+    st.markdown("---")
+    # botao_sair()  # login desabilitado — botão de sair oculto
+    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.11.9</span>',
+                unsafe_allow_html=True)
+
+# ── AJUDA RÁPIDA ──────────────────────────────────────────────────────────────
+with st.expander("❓ Primeira vez aqui? Veja como usar a plataforma"):
+    render_ajuda()
+
+# ── UPLOAD ────────────────────────────────────────────────────────────────────
+sec("01 · Importar Arquivos")
+st.caption("Envie o **CSV** (log técnico), o **XLS** (posição) e/ou o **KML** (raio) de cada "
+           "rastreador. Arquivos com o mesmo nome (extensão diferente) são unidos automaticamente. "
+           "Pode subir só parte deles — o app mostra o que for possível com o que tiver.")
+
+# Fonte de dados: upload manual OU carregado do histórico (Drive)
+import io as _io
+from services import historico as hist
+
+# Se o usuário escolheu abrir um item do histórico, os bytes ficam em session_state
+fonte_bytes = st.session_state.get("hist_arquivos")  # dict {nome: bytes} ou None
+fonte_label = st.session_state.get("hist_label")
+
+arquivos = st.file_uploader("Arquivos dos rastreadores",
+    type=["csv", "xls", "xlsx", "kml"], accept_multiple_files=True)
+
+# Painel de histórico (sempre visível, mesmo sem arquivos carregados)
+hist.painel_historico(st, expandido=(not fonte_bytes and not arquivos))
+
+if fonte_bytes:
+    st.success(f"📂 Carregado do histórico: **{fonte_label}**  ·  {len(fonte_bytes)} arquivo(s). "
+               "Para voltar ao envio manual, use o botão abaixo.")
+    if st.button("↩ Limpar e enviar manualmente"):
+        st.session_state.pop("hist_arquivos", None)
+        st.session_state.pop("hist_label", None)
+        st.rerun()
+
+# Monta dict unificado {nome: bytes} a partir do upload ou do histórico
+arquivos_bytes = {}
+if arquivos:
+    for arq in arquivos:
+        arquivos_bytes[arq.name] = arq.getvalue()
+elif fonte_bytes:
+    arquivos_bytes = dict(fonte_bytes)
+
+if not arquivos_bytes:
+    st.info("⬆️  Envie os arquivos (CSV, XLS e/ou KML) **ou** abra um teste salvo no "
+            "histórico acima.")
+    st.stop()
+
+# Agrupa por nome-base
+grupos = {}
+for nome_arq, conteudo in arquivos_bytes.items():
+    base = nome_base(nome_arq)
+    ext = nome_arq.lower().rsplit(".", 1)[-1]
+    grupos.setdefault(base, {"csv": None, "xls": None, "kml": None})
+    bio = _io.BytesIO(conteudo)
+    bio.name = nome_arq
+    if ext == "csv":
+        grupos[base]["csv"] = bio
+    elif ext == "kml":
+        grupos[base]["kml"] = bio
+    else:  # xls, xlsx
+        grupos[base]["xls"] = bio
+
+# Consolida cada equipamento
+dados = []
+for base, fontes in grupos.items():
+    try:
+        info = consolidar_equipamento(base, fontes["csv"], fontes["xls"],
+                                      kml_file=fontes["kml"], tol_fusao=tol_fusao)
+        dados.append(info)
+    except Exception as e:
+        st.error(str(e))
+if not dados:
+    st.stop()
+
+# Guarda os bytes originais para permitir salvar no histórico depois
+st.session_state["arquivos_bytes_atuais"] = arquivos_bytes
+
+# ── TABELA DE ARQUIVOS ────────────────────────────────────────────────────────
+sec("02 · Equipamentos Carregados")
+rows = "".join(
+    f"<tr><td style='font-family:Barlow Condensed'>{d['modelo']}</td>"
+    f"<td style='font-family:Barlow Condensed;color:{SR_RED};font-weight:700'>{d['pin']}</td>"
+    f"<td style='font-size:.78rem;color:#6b7f8f'>{d['arquivo']}</td>"
+    f"<td>{badge(d['tipo'])}</td>"
+    f"<td style='font-family:Barlow Condensed;color:#6b7f8f'>{d['fonte']}</td>"
+    f"<td style='text-align:right;font-family:Barlow Condensed'>{d['registros']:,}</td></tr>"
+    for d in dados)
+st.markdown(f'<table class="file-table"><thead><tr><th>Modelo</th><th>PIN</th>'
+    f'<th>Arquivo</th><th>Tipo</th><th>Fonte</th><th style="text-align:right">Registros</th></tr></thead>'
+    f'<tbody>{rows}</tbody></table>', unsafe_allow_html=True)
+
+# ── SELEÇÃO ───────────────────────────────────────────────────────────────────
+sec("03 · Configurar Comparação")
+def rotulo(d):
+    # O nome do arquivo (chave do agrupamento) e sempre unico e ja costuma
+    # conter o modelo; garante que dois equipamentos nunca colidam no seletor.
+    if d["pin"] and d["pin"] != "N/A":
+        return f"{d['arquivo']}  ·  PIN {d['pin']}"
+    return d["arquivo"]
+mapa_rotulo = {rotulo(d): d["arquivo"] for d in dados}
+
+reais = [rotulo(d) for d in dados if d["tipo"] == "GPS Real"]
+todos = [rotulo(d) for d in dados]
+cand = reais if reais else todos
+
+# Modo de análise: comparativo (referência × amostras) ou individual (uma peça)
+modo = st.radio(
+    "Modo de análise",
+    ["Comparativo (referência × amostras)", "Individual (inspecionar peças, sem comparar)"],
+    horizontal=True,
+    help="No modo individual você vê consumo, rede, GPS, latência etc. de cada peça, "
+         "sem precisar de uma referência para comparar posição.")
+modo_individual = modo.startswith("Individual")
+
+if modo_individual:
+    referencia = None
+    comparacao = []
+    btn = st.button("🚀  ANALISAR PEÇAS")
+    if not btn and not st.session_state.get("modo_individual"):
+        st.stop()
+    if btn:
+        st.session_state.update({
+            "resultados": {}, "ref_nome": "", "ref_df": pd.DataFrame(),
+            "comparacao": [], "raios": (raio1, raio2, raio3),
+            "modo_individual": True})
+else:
+    cR, cC = st.columns([1, 2])
+    with cR:
+        ref_rot = st.selectbox("🔵 Referência (GPS Real)", cand,
+            help="Rastreador com GPS ligado — geralmente o RI130")
+    with cC:
+        opc = [r for r in todos if r != ref_rot]
+        comp_rot = st.multiselect("🟠 Comparar com", opc, default=opc)
+
+    referencia = mapa_rotulo[ref_rot]
+    comparacao = [mapa_rotulo[r] for r in comp_rot]
+
+    if not comparacao:
+        st.warning("Selecione ao menos um rastreador para comparar, "
+                   "ou mude para o modo **Individual** acima.")
+        st.stop()
+
+    btn = st.button("🚀  INICIAR ANÁLISE COMPLETA")
+    if not btn and not st.session_state.get("resultados"):
+        st.stop()
+
+    if btn:
+        ref_item = next(d for d in dados if d["arquivo"] == referencia)
+        df_ref = ref_item["df"].copy()
+        resultados = {}
+        with st.spinner("Sincronizando e calculando distâncias..."):
+            for nome in comparacao:
+                item = next(d for d in dados if d["arquivo"] == nome)
+                resultados[nome] = sincronizar(df_ref, item["df"].copy(), tolerancia)
+        st.session_state.update({"resultados": resultados, "ref_nome": referencia,
+            "ref_df": df_ref, "comparacao": comparacao, "raios": (raio1, raio2, raio3),
+            "modo_individual": False,
+            "dados_meta": {d["arquivo"]: {k: d[k] for k in ("modelo","pin","tipo","fonte")} for d in dados}})
+
+resultados = st.session_state.get("resultados", {})
+df_ref = st.session_state.get("ref_df", pd.DataFrame())
+comparacao = st.session_state.get("comparacao", [])
+raios = st.session_state.get("raios", (1.0, 3.0, 5.0))
+ref_nome = st.session_state.get("ref_nome", "")
+eh_individual = st.session_state.get("modo_individual", False)
+
+if not eh_individual and not resultados:
+    st.stop()
+
+# Avisos sobre sincronizações vazias
+vazios = [n for n, r in resultados.items() if len(r) == 0]
+if vazios:
+    st.warning("Sem sincronização para: " + ", ".join(vazios) +
+               ". Verifique se há sobreposição de horário ou aumente a tolerância.")
+
+# ── NAVEGAÇÃO (menu na sidebar) + SEÇÕES ──────────────────────────────────────
+vazio_df = pd.DataFrame()
+
+
+def _secao_dados_individual():
+    sec("Exportar")
+    st.caption("O **PDF** reproduz o visual da plataforma; o **Excel** traz os dados "
+               "formatados de cada peça.")
+    cX1, cX2 = st.columns(2)
+    with cX1:
+        if st.button("📄 Gerar PDF", key="btn_pdf_ind", width='stretch'):
+            try:
+                from services.relatorio_pdf import gerar_pdf
+                with st.spinner("Gerando PDF..."):
+                    st.session_state["pdf_bytes"] = gerar_pdf(
+                        {}, dados, raios, ref_nome="", eh_individual=True)
+            except Exception as e:
+                st.error(f"Falha ao gerar o PDF: {e}")
+        if st.session_state.get("pdf_bytes"):
+            st.download_button("📥 Baixar PDF", data=st.session_state["pdf_bytes"],
+                file_name="relatorio_teste_rodagem.pdf", mime="application/pdf",
+                key="dl_pdf_ind", width='stretch')
+    with cX2:
+        st.download_button("📊 Baixar Excel (.xlsx)",
+            data=gerar_excel(None, {}, dados, raios=raios,
+                             tolerancia=tolerancia, tol_fusao=tol_fusao),
+            file_name="analise_posicionamento.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="dl_excel_ind", width='stretch')
+
+    sec("Dados por Equipamento")
+    sel = st.selectbox("Equipamento", [d["arquivo"] for d in dados], key="sel_ind")
+    item = next(d for d in dados if d["arquivo"] == sel)
+    cols = [c for c in item["df"].columns if not c.startswith("_")]
+    st.dataframe(item["df"][cols].head(2000), width='stretch', hide_index=True)
+    st.caption(f"Fonte: {item['fonte']} · até 2000 de {len(item['df'])} registros · "
+               f"PIN {item['pin']} · Tipo: {item['tipo']}")
+    st.download_button("📥 Baixar CSV deste equipamento",
+        data=item["df"][cols].to_csv(index=False).encode("utf-8"),
+        file_name=f"{nome_arquivo_seguro(sel)}.csv", mime="text/csv", key="dl_ind")
+
+
+def _secao_export():
+    sec("Exportar Análise")
+    st.caption("Escolha o formato. O **PDF** reproduz o visual da plataforma (ideal para "
+               "apresentar e compartilhar). O **Excel** é formatado com cores e gráficos "
+               "(ideal para trabalhar os dados). O **CSV** traz só a tabela-resumo.")
+    df_resumo = st.session_state.get("df_resumo")
+
+    cE1, cE2, cE3 = st.columns(3)
+
+    # ── PDF (visual do site) ──
+    with cE1:
+        st.markdown("**📄 Relatório PDF**")
+        st.caption("Com o visual da plataforma.")
+        if st.button("Gerar PDF", key="btn_pdf", width='stretch'):
+            try:
+                from services.relatorio_pdf import gerar_pdf
+                with st.spinner("Gerando PDF..."):
+                    pdf_bytes = gerar_pdf(resultados, dados, raios,
+                                          ref_nome=ref_nome if not eh_individual else "",
+                                          eh_individual=eh_individual,
+                                          tolerancia=tolerancia, tol_fusao=tol_fusao)
+                st.session_state["pdf_bytes"] = pdf_bytes
+            except Exception as e:
+                st.error(f"Falha ao gerar o PDF: {e}")
+        if st.session_state.get("pdf_bytes"):
+            st.download_button("📥 Baixar PDF", data=st.session_state["pdf_bytes"],
+                file_name="relatorio_teste_rodagem.pdf", mime="application/pdf",
+                key="dl_pdf", width='stretch')
+
+    # ── Excel formatado ──
+    with cE2:
+        st.markdown("**📊 Excel Completo**")
+        st.caption("Cores, gráficos e glossário.")
+        st.download_button("📥 Baixar Excel (.xlsx)",
+            data=gerar_excel(df_resumo, resultados, dados, raios=raios,
+                             tolerancia=tolerancia, tol_fusao=tol_fusao),
+            file_name="analise_posicionamento.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="dl_excel", width='stretch')
+
+    # ── CSV resumo ──
+    with cE3:
+        st.markdown("**📋 Resumo CSV**")
+        st.caption("Só a tabela-resumo.")
+        if df_resumo is not None:
+            st.download_button("📥 Baixar CSV",
+                data=df_resumo.to_csv(index=False).encode("utf-8"),
+                file_name="resumo_posicionamento.csv", mime="text/csv", key="dl_csv",
+                width='stretch')
+        else:
+            st.caption("— indisponível —")
+
+    sec("Registros Sincronizados")
+    for nome, df in resultados.items():
+        st.markdown(f"**{nome}** — {len(df)} sincronizações")
+        if len(df) > 0:
+            st.dataframe(df, width='stretch', hide_index=True)
+            st.download_button(f"📥 CSV — {nome}",
+                data=df.to_csv(index=False).encode("utf-8"),
+                file_name=f"sync_{nome_arquivo_seguro(nome)}.csv",
+                mime="text/csv", key=f"dlc_{nome}")
+        else:
+            st.warning("Sem registros sincronizados.")
+
+    sec("Dados Consolidados por Equipamento")
+    sel = st.selectbox("Equipamento", [d["arquivo"] for d in dados], key="sel_bruto")
+    item = next(d for d in dados if d["arquivo"] == sel)
+    cols = [c for c in item["df"].columns if not c.startswith("_")]
+    st.dataframe(item["df"][cols].head(1000), width='stretch', hide_index=True)
+    st.caption(f"Fonte: {item['fonte']} · até 1000 de {len(item['df'])} registros · PIN {item['pin']}")
+
+
+def _secao_historico():
+    sec("Histórico de Relatórios")
+    st.caption("Abra um teste já salvo na pasta do Google Drive, sem precisar enviar os "
+               "arquivos novamente. Cada subpasta da pasta de histórico é um teste.")
+    if hist.disponivel():
+        st.info("O seletor de histórico está disponível no topo da página, na seção "
+                "**01 · Importar Arquivos** → *“Abrir um teste salvo no histórico”*. "
+                "Use-o para carregar um teste e navegar pelas análises.")
+        atual = st.session_state.get("hist_label")
+        if atual:
+            st.success(f"Teste atualmente carregado do histórico: **{atual}**")
+    else:
+        st.info(
+            "📂 O histórico lê os testes de uma **pasta pública do Google Drive**.\n\n"
+            "Como funciona: você organiza, no Drive, uma **subpasta por teste** (ex.: "
+            "*Teste Rota SP BH*) contendo os arquivos CSV / XLS / KML daquele teste. "
+            "A equipe então seleciona o teste e o app baixa os arquivos e roda a "
+            "análise automaticamente.\n\n"
+            "Para ativar, configure em *Settings → Secrets* no Streamlit Cloud:\n"
+            "```toml\n[gdrive]\napi_key = \"SUA_API_KEY\"\nfolder_id = \"ID_DA_PASTA\"\n```\n"
+            "A pasta e suas subpastas devem estar com acesso **\"qualquer pessoa com o link\"**.")
+
+
+# Monta a lista de seções conforme o modo
+if eh_individual:
+    secoes = {
+        "📊 Visão Geral": lambda: g.aba_visao_geral({}, vazio_df, "", raios, dados),
+        "🗺 Mapa": lambda: g.aba_mapa_individual(dados),
+        "🎯 Raio do Sistema": lambda: g.aba_raio_individual(dados),
+        "📶 Rede & Operadora": lambda: g.aba_rede({}, vazio_df, "", [], dados),
+        "🛰 Qualidade GPS": lambda: g.aba_qualidade_gps(vazio_df, "", [], dados),
+        "🚗 Movimento": lambda: g.aba_movimento(vazio_df, "", [], dados),
+        "🔋 Bateria & Sensores": lambda: g.aba_bateria(vazio_df, "", [], dados),
+        "⏱ Latência": lambda: g.aba_latencia(vazio_df, "", [], dados),
+        "📋 Dados": _secao_dados_individual,
+        "💾 Histórico": _secao_historico,
+        "❓ Como Usar": render_ajuda,
+    }
+else:
+    secoes = {
+        "📊 Visão Geral": lambda: g.aba_visao_geral(resultados, df_ref, ref_nome, raios, dados),
+        "🗺 Mapa": lambda: g.aba_mapa(resultados, df_ref, ref_nome),
+        "📍 Precisão GPS": lambda: g.aba_precisao(resultados, raios),
+        "🎯 Raio do Sistema": lambda: g.aba_raio_sistema(resultados),
+        "📶 Rede & Operadora": lambda: g.aba_rede(resultados, df_ref, ref_nome, comparacao, dados),
+        "🛰 Qualidade GPS": lambda: g.aba_qualidade_gps(df_ref, ref_nome, comparacao, dados),
+        "🚗 Movimento": lambda: g.aba_movimento(df_ref, ref_nome, comparacao, dados),
+        "🔋 Bateria & Sensores": lambda: g.aba_bateria(df_ref, ref_nome, comparacao, dados),
+        "⏱ Latência": lambda: g.aba_latencia(df_ref, ref_nome, comparacao, dados),
+        "📋 Dados & Export": _secao_export,
+        "💾 Histórico": _secao_historico,
+        "❓ Como Usar": render_ajuda,
+    }
+
+# Menu de navegação na sidebar (fixo, não rola com a página)
+with nav_placeholder:
+    st.markdown("### 🧭 Navegação")
+    escolha = st.radio("Seção", list(secoes.keys()), label_visibility="collapsed",
+                       key="nav_secao")
+    st.markdown("---")
+
+# Renderiza a seção escolhida na área principal
+secoes[escolha]()
