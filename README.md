@@ -187,3 +187,19 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
 ## v0.12.2
 - Aba Rede & Operadora: "Sem Sinal" renomeado para **"Sem rede"** (em toda a plataforma, gráficos e export); novo card **Total de registros** antes das tecnologias; **percentual em destaque** e quantidade como subtítulo (relatório executivo, sugestão do Thiago); removidas as menções a **3G** (equipamentos operam só em 2G/4G) — o mapeamento 3G é mantido internamente por segurança, aparecendo só se houver dado.
 - Correção: Visão Geral e PDF não quebram mais quando não há amostras comparadas (ex.: todos estimados) — guarda contra concat vazio.
+
+## v0.12.3
+- Rótulo de tecnologia "Sem rede" / "Sem Sinal" renomeado para **"Indefinido"** (registro que subiu sem informação de rede — comum em registros recuperados do buffer, que sobem sem o dado da ERB). Aplicado em toda a plataforma (cards, gráfico, tabela, export) com a explicação atualizada. Mantidas as menções descritivas a "sem sinal" no glossário do buffer (ali descreve o fenômeno, não o rótulo).
+
+## v0.12.4
+- Correção do gráfico "Erro de Posição × Tecnologia de Rede": mostrava o nome cru da coluna (_tech_comp) nos eixos/legenda e o rótulo antigo "Sem Sinal". Agora usa rótulos legíveis (Tecnologia / Erro (km)) e o rótulo atual "Indefinido".
+- Rótulos de eixo legíveis aplicados a todos os gráficos que ainda exibiam nomes internos de coluna (satélites, velocidade, bateria, tensão, temperatura, erro ao longo do tempo).
+
+## v0.13
+- **Precisão: nova tabela de distribuição por faixa** (intervalos exclusivos que somam 100%): 0–R1, R1–R2, R2–R3 e acima de R3, com posições e %. Complementa os cards cumulativos (≤R1, ≤R2, ≤R3) e destaca quantas posições ficaram acima do maior raio.
+- **Modo individual ganhou "Raio do Sistema"**: análise dos raios de incerteza informados pelo sistema SEM comparação (distribuição por faixa de raio + histograma) — útil nos testes sem peça de referência.
+- **Aba Raio do Sistema mais clara:** novo card "Erro médio medido" ao lado do "Raio informado (sistema)", com legenda explicando que raio informado ≠ erro (evita a confusão de achar que o raio máximo limita o erro — um ponto fica fora quando o erro real supera o raio informado naquele ponto, mesmo que o raio seja pequeno).
+
+## v0.13.1
+- Correção do AttributeError na aba "Raio do Sistema" do modo individual: a função agora força o raio para numérico (tolera formatos que trazem o valor como texto), protege o histograma com try/except e valida a existência da coluna — evitando a quebra com certos equipamentos (ex.: mistos).
+- Visão Geral individual: a tabela "Destaques por Área" agora inclui a coluna **Raio médio (sist.)**, mostrando os dados de raio também no modo individual (antes só apareciam no comparativo).
