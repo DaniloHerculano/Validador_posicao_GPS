@@ -47,10 +47,10 @@ def _normaliza_banda(texto: str, tech: str) -> str:
 def parse_networkinfo(info) -> tuple:
     """networkinfo: "FDD LTE","72405","LTE BAND 7",2950 → (tecnologia, operadora, banda)."""
     if pd.isna(info) or str(info).strip() in ("", "NO SERVICE"):
-        return "Sem Sinal", "Desconhecido", "—"
+        return "Sem rede", "Desconhecido", "—"
     s = str(info).strip()
     if "NO SERVICE" in s.upper():
-        return "Sem Sinal", "Desconhecido", "—"
+        return "Sem rede", "Desconhecido", "—"
     parts = [p.strip().strip('"').strip("'") for p in s.split(",")]
     tech = "Desconhecido"
     if parts:
