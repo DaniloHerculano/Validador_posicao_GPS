@@ -34,7 +34,7 @@ TECH_MAP = {
     "EMTC": "4G (LTE-M)", "NB-IOT": "4G (NB-IoT)",
     "WCDMA": "3G", "UMTS": "3G", "HSPA": "3G",
     "GSM": "2G", "GPRS": "2G", "EDGE": "2G",
-    "NO SERVICE": "Sem Sinal",
+    "NO SERVICE": "Sem rede",
 }
 
 # ── Paleta Stoneridge Brasil (Pantone) ──
