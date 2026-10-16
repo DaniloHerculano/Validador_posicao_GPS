@@ -207,8 +207,9 @@ def gerar_pdf(resultados, dados, raios, ref_nome="", eh_individual=False,
     n_est = sum(1 for t in tipos if "Estimada" in t)
     n_real = sum(1 for t in tipos if t == "GPS Real")
     n_misto = sum(1 for t in tipos if "Misto" in t)
-    erros = pd.concat([df["distancia_km"].dropna() for df in resultados.values()
-                       if len(df)], ignore_index=True) if resultados else pd.Series(dtype=float)
+    _se = [df["distancia_km"].dropna() for df in resultados.values()
+           if len(df) and "distancia_km" in df.columns]
+    erros = pd.concat(_se, ignore_index=True) if _se else pd.Series(dtype=float)
     erro_global = erros.mean() if len(erros) else None
 
     _titulo(pdf, "Panorama do Teste")
