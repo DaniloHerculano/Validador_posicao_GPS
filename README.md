@@ -183,3 +183,7 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
 
 ## v0.12.1
 - **Correção do deploy:** o PDF foi migrado de weasyprint (que exigia bibliotecas de sistema e quebrava a instalação no Streamlit Cloud) para **fpdf2**, que é puro Python e instala limpo. Removido o packages.txt (não é mais necessário). O visual do PDF foi mantido praticamente idêntico (hero, cards, tabelas, barras, destaques).
+
+## v0.12.2
+- Aba Rede & Operadora: "Sem Sinal" renomeado para **"Sem rede"** (em toda a plataforma, gráficos e export); novo card **Total de registros** antes das tecnologias; **percentual em destaque** e quantidade como subtítulo (relatório executivo, sugestão do Thiago); removidas as menções a **3G** (equipamentos operam só em 2G/4G) — o mapeamento 3G é mantido internamente por segurança, aparecendo só se houver dado.
+- Correção: Visão Geral e PDF não quebram mais quando não há amostras comparadas (ex.: todos estimados) — guarda contra concat vazio.
