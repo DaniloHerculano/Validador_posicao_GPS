@@ -301,10 +301,10 @@ def gerar_excel(df_resumo, resultados: dict, dados: list,
               if "_operadora" in df.columns and df["_operadora"].notna().any() else "—")
         linhas.append({
             "Modelo": d.get("modelo", "—"), "PIN": d["pin"], "Tipo": d["tipo"],
-            "Fonte": d.get("fonte", "—"), "Registros": total,
+            "Fonte": d.get("fonte", "—"), "Total Registros": total,
             "4G": int(df["_tech"].str.startswith("4G").sum()) if tem_tech else 0,
-            "3G": int(df["_tech"].str.startswith("3G").sum()) if tem_tech else 0,
             "2G": int(df["_tech"].str.startswith("2G").sum()) if tem_tech else 0,
+            "Sem rede": int((df["_tech"] == "Sem rede").sum()) if tem_tech else 0,
             "Operadora": op,
             "Bateria Início (%)": bat.iloc[0] if len(bat) else None,
             "Bateria Fim (%)": bat.iloc[-1] if len(bat) else None,
