@@ -229,6 +229,11 @@ def _destaques_areas(dados, _dtec):
         if bcol in dtec.columns and dtec[bcol].notna().any():
             bp = dtec[bcol].dropna()
             reg["Bateria"] = f"{bp.iloc[0]:.0f}%→{bp.iloc[-1]:.0f}%"
+        # Raio do sistema (informado) — útil nos testes sem referência
+        if "raio_km" in dtec.columns:
+            rk = pd.to_numeric(dtec["raio_km"], errors="coerce").dropna()
+            if len(rk) > 0:
+                reg["Raio médio (sist.)"] = f"{rk.mean():.2f} km"
         # Latência em tempo real (exclui buffer) + nº bufferizado
         if "_latencia_s" in dtec.columns and dtec["_latencia_s"].notna().any():
             if "_buffer_bool" in dtec.columns:
@@ -1331,19 +1336,21 @@ def aba_raio_individual(dados):
     algum = False
     for ci, d in enumerate(dados):
         dtec = _dtec(d)
-        if dtec is None or "raio_km" not in dtec.columns:
+        if dtec is None or not hasattr(dtec, "columns") or "raio_km" not in dtec.columns:
             continue
-        rk = dtec["raio_km"].dropna()
+        # Força numérico (alguns formatos podem trazer o raio como texto)
+        rk = pd.to_numeric(dtec["raio_km"], errors="coerce").dropna()
         if len(rk) == 0:
             continue
         algum = True
-        with st.expander(f"🎯 {d['arquivo']} · raio médio {rk.mean():.2f} km",
+        rmean, rmin, rmax = float(rk.mean()), float(rk.min()), float(rk.max())
+        with st.expander(f"🎯 {d['arquivo']} · raio médio {rmean:.2f} km",
                          expanded=(ci == 0)):
             grid(
                 tile("Posições com raio", f"{len(rk):,}", cc="blue"),
-                tile("Raio médio", f"{rk.mean():.3f} km", cc="amber"),
-                tile("Raio mínimo", f"{rk.min():.3f} km", "mais preciso", cc="green"),
-                tile("Raio máximo", f"{rk.max():.3f} km", "menos preciso"),
+                tile("Raio médio", f"{rmean:.3f} km", cc="amber"),
+                tile("Raio mínimo", f"{rmin:.3f} km", "mais preciso", cc="green"),
+                tile("Raio máximo", f"{rmax:.3f} km", "menos preciso"),
             )
             # Distribuição por faixa de raio
             n = len(rk)
@@ -1354,15 +1361,20 @@ def aba_raio_individual(dados):
             st.markdown("**Distribuição dos raios informados pelo sistema:**")
             dist_df = pd.DataFrame([
                 {"Faixa de raio": "até 0,5 km (ótimo)", "Posições": fa, "%": round(fa/n*100, 1)},
-                {"Faixa de raio": "0,5 – 1 km (bom)", "Posições": fb, "%": round(fb/n*100, 1)},
-                {"Faixa de raio": "1 – 3 km (regular)", "Posições": fc, "%": round(fc/n*100, 1)},
+                {"Faixa de raio": "0,5 - 1 km (bom)", "Posições": fb, "%": round(fb/n*100, 1)},
+                {"Faixa de raio": "1 - 3 km (regular)", "Posições": fc, "%": round(fc/n*100, 1)},
                 {"Faixa de raio": "acima de 3 km (impreciso)", "Posições": fd, "%": round(fd/n*100, 1)},
             ])
             st.dataframe(dist_df, width='stretch', hide_index=True)
-            fig = px.histogram(rk.to_frame("raio_km"), x="raio_km", nbins=30,
-                title="Distribuição dos Raios de Incerteza", color_discrete_sequence=[SR_RED],
-                labels={"raio_km": "Raio do sistema (km)", "count": "Posições"})
-            st.plotly_chart(aplica_tema(fig), width='stretch', key=f"raioind_{ci}")
+            try:
+                dfr = pd.DataFrame({"raio": rk.values})
+                fig = px.histogram(dfr, x="raio", nbins=30,
+                    title="Distribuição dos Raios de Incerteza",
+                    color_discrete_sequence=[SR_RED],
+                    labels={"raio": "Raio do sistema (km)", "count": "Posições"})
+                st.plotly_chart(aplica_tema(fig), width='stretch', key=f"raioind_{ci}")
+            except Exception:
+                pass
     if not algum:
         st.info("📄 Nenhum equipamento tem o raio do sistema disponível. O raio vem do "
                 "**KML** (formato antigo) ou da coluna *radius* do **CSV do firmware**.")
