@@ -43,8 +43,9 @@ def aba_visao_geral(resultados, df_ref, ref_nome, raios, dados=None):
     total_reg = sum(d.get("registros", 0) for d in dados) if dados else 0
 
     # Erro global (média ponderada das amostras comparadas)
-    erros = pd.concat([df["distancia_km"].dropna() for df in resultados.values()
-                       if len(df)], ignore_index=True) if resultados else pd.Series(dtype=float)
+    _series_erro = [df["distancia_km"].dropna() for df in resultados.values()
+                    if len(df) and "distancia_km" in df.columns]
+    erros = pd.concat(_series_erro, ignore_index=True) if _series_erro else pd.Series(dtype=float)
     erro_medio_global = erros.mean() if len(erros) else None
 
     if eh_individual:
@@ -630,26 +631,27 @@ def _rede_um(df_raw, titulo, df_prec=None, kid="x", expandir=False):
         tech_counts = df_raw["_tech"].value_counts()
         op_counts = df_raw["_operadora"].value_counts()
         c4 = df_raw["_tech"].str.startswith("4G").sum()
-        c3 = df_raw["_tech"].str.startswith("3G").sum()
         c2 = df_raw["_tech"].str.startswith("2G").sum()
-        cn = (df_raw["_tech"] == "Sem Sinal").sum()
-        # Base única = todos os registros técnicos (inclui Sem Sinal) para consistência
+        cn = (df_raw["_tech"] == "Sem rede").sum()
+        # Base única = todos os registros técnicos para consistência dos percentuais
         p4 = round(c4/total*100, 1) if total else 0
-        p3 = round(c3/total*100, 1) if total else 0
         p2 = round(c2/total*100, 1) if total else 0
         pn = round(cn/total*100, 1) if total else 0
-        st.caption(f"Base: {total:,} registros técnicos (CSV). Percentuais sobre o total.")
+        st.caption(f"Base: {total:,} registros técnicos (CSV). Percentuais sobre o total. "
+                   "\"Sem rede\" = registro sem conexão celular no momento (campo de rede "
+                   "vazio ou NO SERVICE).")
+        # Percentual em destaque (valor grande) e a quantidade como subtítulo
         grid(
-            tile("4G", f"{c4:,}", f"{p4}%", "green"),
-            tile("3G", f"{c3:,}", f"{p3}%", "amber"),
-            tile("2G", f"{c2:,}", f"{p2}%"),
-            tile("Sem Sinal", f"{cn:,}", f"{pn}%"),
+            tile("Total de registros", f"{total:,}", "100%", "blue"),
+            tile("4G", f"{p4}%", f"{c4:,} registros", "green"),
+            tile("2G", f"{p2}%", f"{c2:,} registros", "amber"),
+            tile("Sem rede", f"{pn}%", f"{cn:,} registros"),
         )
         c1, c2c = st.columns(2)
         with c1:
             fig = go.Figure(go.Pie(labels=tech_counts.index, values=tech_counts.values,
                 hole=0.55, marker=dict(colors=COLORS_TECH)))
-            fig.update_layout(title="Tecnologia de Rede (2G / 3G / 4G)")
+            fig.update_layout(title="Tecnologia de Rede")
             st.plotly_chart(aplica_tema(fig), width='stretch', key=f"pietech_{kid}")
         with c2c:
             cores = [SR_RED if o == "TIM" else SR_SLATE if o == "Claro"
@@ -706,10 +708,10 @@ def _rede_um(df_raw, titulo, df_prec=None, kid="x", expandir=False):
 
 
 def aba_rede(resultados, df_ref, ref_nome, comparacao, dados):
-    explicacao("Analisa **como o rastreador se comunica**: tecnologia (2G/3G/4G), "
+    explicacao("Analisa **como o rastreador se comunica**: tecnologia (2G / 4G), "
                "operadora e a **banda/frequência** do modem (GSM850/900/1800/1900, "
                "LTE B3/B7/B28...). Vem do CSV técnico completo.<br><br>"
-               "• <b>Sem Sinal</b> (na tecnologia): o registro não tinha rede alguma — o "
+               "• <b>Sem rede</b> (na tecnologia): o registro não tinha rede alguma — o "
                "modem estava sem cobertura (campo de rede vazio ou \"NO SERVICE\").<br>"
                "• <b>Sem Operadora</b> (na operadora): o modem reportou código nulo "
                "(00000), típico de quando está tentando se registrar mas ainda não fixou "
