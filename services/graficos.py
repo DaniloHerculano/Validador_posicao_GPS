@@ -90,7 +90,7 @@ def aba_visao_geral(resultados, df_ref, ref_nome, raios, dados=None):
     sec("Precisão de Posição (amostras estimadas)")
     linhas = []
     for nome, df in resultados.items():
-        if len(df) == 0:
+        if len(df) == 0 or "distancia_km" not in df.columns:
             continue
         d = df["distancia_km"].dropna()
         if len(d) == 0:
@@ -160,6 +160,8 @@ def _destaques_melhor_pior(resultados, dados, _dtec, raio2):
     erro_por_eq = {}
     raio_por_eq = {}
     for nome, df in resultados.items():
+        if df is None or len(df) == 0 or "distancia_km" not in df.columns:
+            continue
         d = df["distancia_km"].dropna()
         if len(d):
             erro_por_eq[nome] = d.mean()
@@ -424,7 +426,8 @@ def aba_mapa(resultados, df_ref, ref_nome):
             dt_txt = pd.to_datetime(dfv["horario_comp"]).dt.strftime("%d/%m/%Y %H:%M:%S")
         else:
             dt_txt = pd.Series([""] * len(dfv), index=dfv.index)
-        erro_txt = [f"{d:.3f} km" if pd.notna(d) else "—" for d in dfv["distancia_km"]]
+        _dist_col = dfv["distancia_km"] if "distancia_km" in dfv.columns else pd.Series([None]*len(dfv), index=dfv.index)
+        erro_txt = [f"{d:.3f} km" if pd.notna(d) else "—" for d in _dist_col]
         customdata = list(zip(erro_txt, list(dt_txt)))
 
         tem_raio_eq = "raio_km" in dfv.columns and dfv["raio_km"].notna().any()
@@ -1325,20 +1328,81 @@ def aba_latencia(df_ref, ref_nome, comparacao, dados):
             _lat_um(_dtec(item), nome, kid=f"c{ci}")
 
 # ══════════════════════════════════════════════════════════════════════════════
-def aba_raio_individual(dados):
+def _bloco_faixas_raio(rk, raio1, raio2, raio3, kid):
+    """
+    Análise das faixas do RAIO DE INCERTEZA informado pelo sistema, usando os
+    raios configurados em Parâmetros (R1/R2/R3). rk = série de raios (km).
+    Mostra cards cumulativos (<=R1, <=R2, <=R3) + tabela de faixas exclusivas
+    (0-R1, R1-R2, R2-R3, acima de R3) + o que passou do limite máximo.
+    """
+    rk = pd.to_numeric(rk, errors="coerce").dropna()
+    n = len(rk)
+    if n == 0:
+        return
+
+    # Cumulativos (cada faixa inclui as menores)
+    c1 = int((rk <= raio1).sum())
+    c2 = int((rk <= raio2).sum())
+    c3 = int((rk <= raio3).sum())
+    p1 = round(c1 / n * 100, 1)
+    p2 = round(c2 / n * 100, 1)
+    p3 = round(c3 / n * 100, 1)
+
+    st.markdown("**Precisão do sistema por raio configurado** (acumulado — cada faixa "
+                "inclui as menores):")
+    grid(
+        tile(f"Raio ≤ {raio1:.0f} km", f"{p1}%", f"{c1:,} posições", "green"),
+        tile(f"Raio ≤ {raio2:.0f} km", f"{p2}%", f"{c2:,} posições", "amber"),
+        tile(f"Raio ≤ {raio3:.0f} km", f"{p3}%", f"{c3:,} posições"),
+    )
+    st.caption(f"Ex.: \"Raio ≤ {raio2:.0f} km\" = posições cujo raio de incerteza do "
+               f"sistema é de até {raio2:.0f} km (inclui as de até {raio1:.0f} km).")
+
+    # Faixas exclusivas (somam 100%)
+    f1 = int((rk <= raio1).sum())
+    f2 = int(((rk > raio1) & (rk <= raio2)).sum())
+    f3 = int(((rk > raio2) & (rk <= raio3)).sum())
+    f4 = int((rk > raio3).sum())
+    st.markdown("**Distribuição por faixa de raio** (intervalos exclusivos — somam 100%):")
+    faixas_df = pd.DataFrame([
+        {"Faixa de raio": f"0 – {raio1:.0f} km", "Posições": f1, "%": round(f1/n*100, 1)},
+        {"Faixa de raio": f"{raio1:.0f} – {raio2:.0f} km", "Posições": f2, "%": round(f2/n*100, 1)},
+        {"Faixa de raio": f"{raio2:.0f} – {raio3:.0f} km", "Posições": f3, "%": round(f3/n*100, 1)},
+        {"Faixa de raio": f"acima de {raio3:.0f} km", "Posições": f4, "%": round(f4/n*100, 1)},
+    ])
+    st.dataframe(faixas_df, width='stretch', hide_index=True)
+    if f4 > 0:
+        st.caption(f"⚠️ {f4} posição(ões) ({f4/n*100:.1f}%) tiveram raio de incerteza "
+                   f"**acima de {raio3:.0f} km** — o sistema estava pouco preciso nessas "
+                   f"posições.")
+    # Gráfico de barras das faixas
+    cores = ["#1f8b4c", "#e08a1e", "#dd6b0c", SR_RED]
+    fig = go.Figure(go.Bar(x=faixas_df["Faixa de raio"], y=faixas_df["Posições"],
+        marker_color=cores, text=[f"{v}<br>{p}%" for v, p in
+        zip(faixas_df["Posições"], faixas_df["%"])], textposition="outside"))
+    fig.update_layout(title="Posições por Faixa de Raio de Incerteza", showlegend=False)
+    st.plotly_chart(aplica_tema(fig), width='stretch', key=f"faixaraio_{kid}")
+
+
+def aba_raio_individual(dados, raios=(1.0, 3.0, 5.0)):
     """Análise do raio do sistema SEM comparação (quando não há peça de referência).
     Mostra a distribuição dos raios de incerteza que o sistema informou."""
     explicacao("Mostra os **raios de incerteza** que o próprio sistema PST informou para "
                "cada posição estimada — sem comparar com uma referência. Útil quando não "
                "há peça com GPS real no teste: avalia o quão 'confiante' o sistema estava "
                "em cada posição (raio menor = mais preciso, na visão do sistema).")
+    raio1, raio2, raio3 = raios
     sec("Raio do Sistema (sem comparação)")
+    st.caption("O **raio de incerteza** é informado pelo próprio sistema PST para cada "
+               "posição (vem do CSV/KML). Raio menor = o sistema estava mais confiante "
+               "na posição. As faixas abaixo usam os raios configurados em **Parâmetros** "
+               f"(hoje {raio1:.0f} / {raio2:.0f} / {raio3:.0f} km) — altere-os lá para "
+               "mudar a análise.")
     algum = False
     for ci, d in enumerate(dados):
         dtec = _dtec(d)
         if dtec is None or not hasattr(dtec, "columns") or "raio_km" not in dtec.columns:
             continue
-        # Força numérico (alguns formatos podem trazer o raio como texto)
         rk = pd.to_numeric(dtec["raio_km"], errors="coerce").dropna()
         if len(rk) == 0:
             continue
@@ -1352,42 +1416,24 @@ def aba_raio_individual(dados):
                 tile("Raio mínimo", f"{rmin:.3f} km", "mais preciso", cc="green"),
                 tile("Raio máximo", f"{rmax:.3f} km", "menos preciso"),
             )
-            # Distribuição por faixa de raio
-            n = len(rk)
-            fa = int((rk <= 0.5).sum())
-            fb = int(((rk > 0.5) & (rk <= 1)).sum())
-            fc = int(((rk > 1) & (rk <= 3)).sum())
-            fd = int((rk > 3).sum())
-            st.markdown("**Distribuição dos raios informados pelo sistema:**")
-            dist_df = pd.DataFrame([
-                {"Faixa de raio": "até 0,5 km (ótimo)", "Posições": fa, "%": round(fa/n*100, 1)},
-                {"Faixa de raio": "0,5 - 1 km (bom)", "Posições": fb, "%": round(fb/n*100, 1)},
-                {"Faixa de raio": "1 - 3 km (regular)", "Posições": fc, "%": round(fc/n*100, 1)},
-                {"Faixa de raio": "acima de 3 km (impreciso)", "Posições": fd, "%": round(fd/n*100, 1)},
-            ])
-            st.dataframe(dist_df, width='stretch', hide_index=True)
-            try:
-                dfr = pd.DataFrame({"raio": rk.values})
-                fig = px.histogram(dfr, x="raio", nbins=30,
-                    title="Distribuição dos Raios de Incerteza",
-                    color_discrete_sequence=[SR_RED],
-                    labels={"raio": "Raio do sistema (km)", "count": "Posições"})
-                st.plotly_chart(aplica_tema(fig), width='stretch', key=f"raioind_{ci}")
-            except Exception:
-                pass
+            _bloco_faixas_raio(rk, raio1, raio2, raio3, kid=f"ind{ci}")
     if not algum:
         st.info("📄 Nenhum equipamento tem o raio do sistema disponível. O raio vem do "
                 "**KML** (formato antigo) ou da coluna *radius* do **CSV do firmware**.")
 
 
-def aba_raio_sistema(resultados):
+def aba_raio_sistema(resultados, raios=(1.0, 3.0, 5.0)):
     explicacao("Valida o **próprio sistema PST**: compara a distância medida com o **raio de incerteza** que o sistema informou para cada posição estimada, indicando o **% de vezes** em que a posição real caiu dentro do raio prometido.")
     """Valida a distância medida contra o raio de incerteza do próprio sistema (KML)."""
     from services.analise import resumo_raio
-    sec("Validação contra o Raio do Sistema (KML)")
-    st.caption("Compara a distância medida (referência × amostra) com o raio de incerteza "
-               "que o próprio sistema PST calcula para cada posição estimada. "
-               "Indica o % de pontos em que a posição real caiu dentro do raio prometido pelo sistema.")
+    raio1, raio2, raio3 = raios
+    sec("Validação contra o Raio do Sistema")
+    st.caption("Esta aba tem **duas análises**: (1) **validação** — compara a distância "
+               "real medida (referência × amostra) com o raio de incerteza do sistema, "
+               "mostrando quantas posições reais caíram dentro do raio prometido; e "
+               "(2) **faixas de raio** — a distribuição dos raios de incerteza informados "
+               "pelo sistema, pelos raios configurados em Parâmetros "
+               f"({raio1:.0f} / {raio2:.0f} / {raio3:.0f} km).")
 
     algum = False
     for ci, (nome, df) in enumerate(resultados.items()):
@@ -1416,6 +1462,13 @@ def aba_raio_sistema(resultados):
                        "cada posição (não é o erro). Um ponto está **fora** quando a "
                        "distância real medida é maior que o raio informado naquele ponto — "
                        "por isso pode haver pontos fora mesmo com raios pequenos.")
+
+            # ── Faixas do raio de incerteza (pelos parâmetros R1/R2/R3) ──
+            st.markdown("---")
+            _bloco_faixas_raio(df["raio_km"], raio1, raio2, raio3, kid=f"comp{ci}")
+            st.markdown("---")
+            st.markdown("**Validação contra a referência** (posição real × raio do sistema):")
+
             val = df.dropna(subset=["dentro_raio", "distancia_km", "raio_km"]).copy()
             # Garantir tipo booleano limpo para somas e negação
             val["dentro_raio"] = val["dentro_raio"].astype(bool)

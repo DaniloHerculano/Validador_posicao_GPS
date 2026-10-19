@@ -294,5 +294,137 @@ def gerar_pdf(resultados, dados, raios, ref_nome="", eh_individual=False,
                    "indica registros que subiram atrasados após perda de sinal (não é "
                    "lentidão de rede).")
 
+    # ── Distribuição de precisão por faixa (comparativo) ──
+    if not eh_individual and resultados:
+        for nome, df in resultados.items():
+            if "distancia_km" not in df.columns:
+                continue
+            d = df["distancia_km"].dropna()
+            if len(d) == 0:
+                continue
+            n = len(d)
+            fx = pd.DataFrame([
+                {"Faixa de erro": f"0 - {raio1:.0f} km", "Posições": int((d <= raio1).sum()),
+                 "%": f"{(d <= raio1).mean()*100:.1f}"},
+                {"Faixa de erro": f"{raio1:.0f} - {raio2:.0f} km",
+                 "Posições": int(((d > raio1) & (d <= raio2)).sum()),
+                 "%": f"{((d > raio1) & (d <= raio2)).mean()*100:.1f}"},
+                {"Faixa de erro": f"{raio2:.0f} - {raio3:.0f} km",
+                 "Posições": int(((d > raio2) & (d <= raio3)).sum()),
+                 "%": f"{((d > raio2) & (d <= raio3)).mean()*100:.1f}"},
+                {"Faixa de erro": f"acima de {raio3:.0f} km", "Posições": int((d > raio3).sum()),
+                 "%": f"{(d > raio3).mean()*100:.1f}"},
+            ])
+            if pdf.get_y() > 235:
+                pdf.add_page()
+            _titulo(pdf, f"Precisão por Faixa - {_curto(nome)}")
+            _tabela(pdf, fx)
+
+    # ── Raio do sistema: faixas (ambos os modos) ──
+    for d in dados:
+        dtec = _dtec(d)
+        if dtec is None or "raio_km" not in dtec.columns:
+            continue
+        rk = pd.to_numeric(dtec["raio_km"], errors="coerce").dropna()
+        if len(rk) == 0:
+            continue
+        n = len(rk)
+        fx = pd.DataFrame([
+            {"Faixa de raio": f"0 - {raio1:.0f} km", "Posições": int((rk <= raio1).sum()),
+             "%": f"{(rk <= raio1).mean()*100:.1f}"},
+            {"Faixa de raio": f"{raio1:.0f} - {raio2:.0f} km",
+             "Posições": int(((rk > raio1) & (rk <= raio2)).sum()),
+             "%": f"{((rk > raio1) & (rk <= raio2)).mean()*100:.1f}"},
+            {"Faixa de raio": f"{raio2:.0f} - {raio3:.0f} km",
+             "Posições": int(((rk > raio2) & (rk <= raio3)).sum()),
+             "%": f"{((rk > raio2) & (rk <= raio3)).mean()*100:.1f}"},
+            {"Faixa de raio": f"acima de {raio3:.0f} km", "Posições": int((rk > raio3).sum()),
+             "%": f"{(rk > raio3).mean()*100:.1f}"},
+        ])
+        if pdf.get_y() > 235:
+            pdf.add_page()
+        _titulo(pdf, f"Raio do Sistema por Faixa - {_curto(d.get('arquivo','-'))}")
+        _tabela(pdf, fx)
+        _nota(pdf, f"Raio médio informado: {rk.mean():.3f} km (min {rk.min():.2f}, "
+                   f"max {rk.max():.2f}). O raio de incerteza é declarado pelo sistema "
+                   f"para cada posição - raio menor = sistema mais confiante.")
+
+    # ── Rede / tecnologia por equipamento ──
+    linhas_rede = []
+    for d in dados:
+        dtec = _dtec(d)
+        if dtec is None or "_tech" not in dtec.columns or dtec["_tech"].isna().all():
+            continue
+        total = len(dtec)
+        c4 = int(dtec["_tech"].str.startswith("4G").sum())
+        c2 = int(dtec["_tech"].str.startswith("2G").sum())
+        ci_ = int((dtec["_tech"] == "Indefinido").sum())
+        op = dtec["_operadora"].mode().iloc[0] if "_operadora" in dtec.columns and dtec["_operadora"].notna().any() else "-"
+        bd = "-"
+        if "_banda" in dtec.columns and (dtec["_banda"] != "-").any():
+            bb = dtec[dtec["_banda"] != "-"]["_banda"].mode()
+            bd = bb.iloc[0] if len(bb) else "-"
+        linhas_rede.append({"Equipamento": _curto(d.get("arquivo", "-")),
+            "Total": total, "4G": f"{c4/total*100:.0f}%", "2G": f"{c2/total*100:.0f}%",
+            "Indefinido": f"{ci_/total*100:.0f}%", "Operadora": op, "Banda": bd})
+    if linhas_rede:
+        if pdf.get_y() > 235:
+            pdf.add_page()
+        _titulo(pdf, "Rede e Operadora")
+        _tabela(pdf, pd.DataFrame(linhas_rede))
+        _nota(pdf, "\"Indefinido\" = registro sem informação de rede no momento (comum em "
+                   "registros recuperados do buffer, que sobem sem o dado da ERB).")
+
+    # ── Qualidade GPS (satélites / DOP) ──
+    linhas_gps = []
+    for d in dados:
+        dtec = _dtec(d)
+        if dtec is None:
+            continue
+        reg = {"Equipamento": _curto(d.get("arquivo", "-"))}
+        tem = False
+        if "satellitenumber" in dtec.columns and dtec["satellitenumber"].notna().any():
+            s = dtec["satellitenumber"].dropna()
+            reg["Satélites (méd)"] = f"{s.mean():.1f}"
+            reg["Satélites (min-max)"] = f"{int(s.min())}-{int(s.max())}"
+            tem = True
+        if "hdop" in dtec.columns and dtec["hdop"].notna().any():
+            reg["HDOP médio"] = f"{dtec['hdop'].dropna().mean():.1f}"
+            tem = True
+        if tem:
+            linhas_gps.append(reg)
+    if linhas_gps:
+        if pdf.get_y() > 235:
+            pdf.add_page()
+        _titulo(pdf, "Qualidade de GPS")
+        _tabela(pdf, pd.DataFrame(linhas_gps))
+        _nota(pdf, "Satélites e DOP só existem quando o GPS está ligado. Mais satélites "
+                   "e DOP menor indicam melhor qualidade de posição.")
+
+    # ── Latência e Buffer detalhado ──
+    linhas_lat = []
+    for d in dados:
+        dtec = _dtec(d)
+        if dtec is None or "_latencia_s" not in dtec.columns or dtec["_latencia_s"].isna().all():
+            continue
+        bufm = dtec["_buffer_bool"].fillna(False) if "_buffer_bool" in dtec.columns \
+            else pd.Series(False, index=dtec.index)
+        real = dtec[~bufm]["_latencia_s"].dropna()
+        buf = dtec[bufm]["_latencia_s"].dropna()
+        reg = {"Equipamento": _curto(d.get("arquivo", "-")),
+               "Lat real média": f"{real.mean():.1f}s" if len(real) else "-",
+               "Lat real máx": f"{real.max():.0f}s" if len(real) else "-",
+               "% <=90s": f"{(real <= 90).mean()*100:.1f}" if len(real) else "-",
+               "Reg. buffer": f"{len(buf)} ({len(buf)/len(dtec)*100:.0f}%)" if len(buf) else "0"}
+        linhas_lat.append(reg)
+    if linhas_lat:
+        if pdf.get_y() > 235:
+            pdf.add_page()
+        _titulo(pdf, "Latência e Buffer")
+        _tabela(pdf, pd.DataFrame(linhas_lat))
+        _nota(pdf, "Latência = tempo entre o registro no módulo e a chegada ao servidor. "
+                   "\"Lat real\" exclui os registros de buffer (que sobem atrasados após "
+                   "perda de sinal e, por serem LIFO, não refletem a velocidade real).")
+
     out = pdf.output()
     return bytes(out)

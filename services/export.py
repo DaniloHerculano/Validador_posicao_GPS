@@ -642,6 +642,100 @@ def gerar_excel(df_resumo, resultados: dict, dados: list,
             line.height = 8; line.width = 20
             ws3.add_chart(line, f"{chr(65 + len(dfx.columns) + 1)}2")
 
+    # ── Aba FAIXAS DE PRECISÃO (erro por faixa, comparativo) ──
+    linhas_fp = []
+    for nome, df in resultados.items():
+        if "distancia_km" not in df.columns:
+            continue
+        d = df["distancia_km"].dropna()
+        if len(d) == 0:
+            continue
+        n = len(d)
+        linhas_fp.append({
+            "Equipamento": nome,
+            f"0-{raio1:.0f}km (pos)": int((d <= raio1).sum()),
+            f"0-{raio1:.0f}km (%)": round((d <= raio1).mean()*100, 1),
+            f"{raio1:.0f}-{raio2:.0f}km (pos)": int(((d > raio1) & (d <= raio2)).sum()),
+            f"{raio1:.0f}-{raio2:.0f}km (%)": round(((d > raio1) & (d <= raio2)).mean()*100, 1),
+            f"{raio2:.0f}-{raio3:.0f}km (pos)": int(((d > raio2) & (d <= raio3)).sum()),
+            f"{raio2:.0f}-{raio3:.0f}km (%)": round(((d > raio2) & (d <= raio3)).mean()*100, 1),
+            f">{raio3:.0f}km (pos)": int((d > raio3).sum()),
+            f">{raio3:.0f}km (%)": round((d > raio3).mean()*100, 1),
+        })
+    if linhas_fp:
+        wsfp = wb.create_sheet("Faixas_Precisão")
+        _escreve_df(wsfp, pd.DataFrame(linhas_fp))
+
+    # ── Aba FAIXAS DE RAIO (raio de incerteza por faixa, ambos os modos) ──
+    linhas_fr = []
+    for d in dados:
+        dtec = _dtec(d)
+        if dtec is None or "raio_km" not in dtec.columns:
+            continue
+        rk = pd.to_numeric(dtec["raio_km"], errors="coerce").dropna()
+        if len(rk) == 0:
+            continue
+        n = len(rk)
+        linhas_fr.append({
+            "Equipamento": d.get("arquivo", "—"),
+            "Raio médio (km)": round(rk.mean(), 3),
+            f"0-{raio1:.0f}km (pos)": int((rk <= raio1).sum()),
+            f"0-{raio1:.0f}km (%)": round((rk <= raio1).mean()*100, 1),
+            f"{raio1:.0f}-{raio2:.0f}km (pos)": int(((rk > raio1) & (rk <= raio2)).sum()),
+            f"{raio1:.0f}-{raio2:.0f}km (%)": round(((rk > raio1) & (rk <= raio2)).mean()*100, 1),
+            f"{raio2:.0f}-{raio3:.0f}km (pos)": int(((rk > raio2) & (rk <= raio3)).sum()),
+            f"{raio2:.0f}-{raio3:.0f}km (%)": round(((rk > raio2) & (rk <= raio3)).mean()*100, 1),
+            f">{raio3:.0f}km (pos)": int((rk > raio3).sum()),
+            f">{raio3:.0f}km (%)": round((rk > raio3).mean()*100, 1),
+        })
+    if linhas_fr:
+        wsfr = wb.create_sheet("Faixas_Raio")
+        _escreve_df(wsfr, pd.DataFrame(linhas_fr))
+
+    # ── Aba QUALIDADE GPS ──
+    linhas_gps = []
+    for d in dados:
+        dtec = _dtec(d)
+        if dtec is None:
+            continue
+        reg = {"Equipamento": d.get("arquivo", "—")}
+        tem = False
+        if "satellitenumber" in dtec.columns and dtec["satellitenumber"].notna().any():
+            s = dtec["satellitenumber"].dropna()
+            reg["Satélites médio"] = round(s.mean(), 1)
+            reg["Satélites mín"] = int(s.min())
+            reg["Satélites máx"] = int(s.max())
+            tem = True
+        if "hdop" in dtec.columns and dtec["hdop"].notna().any():
+            reg["HDOP médio"] = round(dtec["hdop"].dropna().mean(), 2)
+            tem = True
+        if "vdop" in dtec.columns and dtec["vdop"].notna().any():
+            reg["VDOP médio"] = round(dtec["vdop"].dropna().mean(), 2)
+            tem = True
+        if tem:
+            linhas_gps.append(reg)
+    if linhas_gps:
+        wsg = wb.create_sheet("Qualidade_GPS")
+        _escreve_df(wsg, pd.DataFrame(linhas_gps))
+
+    # ── Aba MOVIMENTO ──
+    linhas_mov = []
+    for d in dados:
+        dtec = _dtec(d)
+        if dtec is None or "speed" not in dtec.columns or dtec["speed"].isna().all():
+            continue
+        s = dtec["speed"].dropna()
+        linhas_mov.append({
+            "Equipamento": d.get("arquivo", "—"),
+            "Vel. média (km/h)": round(s.mean(), 1),
+            "Vel. máxima (km/h)": round(s.max(), 1),
+            "% em movimento (>3km/h)": round((s > 3).mean()*100, 1),
+            "Registros": len(s),
+        })
+    if linhas_mov:
+        wsm = wb.create_sheet("Movimento")
+        _escreve_df(wsm, pd.DataFrame(linhas_mov))
+
     # ── Aba GLOSSÁRIO (para leitura sem a plataforma) ──
     _aba_glossario(wb)
 
