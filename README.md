@@ -203,3 +203,19 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
 ## v0.13.1
 - Correção do AttributeError na aba "Raio do Sistema" do modo individual: a função agora força o raio para numérico (tolera formatos que trazem o valor como texto), protege o histograma com try/except e valida a existência da coluna — evitando a quebra com certos equipamentos (ex.: mistos).
 - Visão Geral individual: a tabela "Destaques por Área" agora inclui a coluna **Raio médio (sist.)**, mostrando os dados de raio também no modo individual (antes só apareciam no comparativo).
+
+## v0.14
+- **Aba Raio do Sistema reformulada, nos dois modos (comparativo e individual):** nova análise das faixas do raio de incerteza informado pelo sistema, usando os raios configurados em Parâmetros (R1/R2/R3, editáveis — não mais fixos em 1/3/5).
+  - Cards cumulativos: raio ≤R1, ≤R2, ≤R3 (cada um inclui os menores).
+  - Tabela de faixas exclusivas (somam 100%): 0–R1, R1–R2, R2–R3 e acima de R3, com posições e %.
+  - Destaque do que ficou acima do raio máximo; gráfico de barras por faixa.
+  - Explicações em cada parte, para uso por qualquer pessoa sem dúvidas.
+  - No comparativo, mantém também a validação original (posição real × raio do sistema).
+  - Se alterar os raios em Parâmetros e reanalisar, a distribuição muda.
+- Correções de robustez: Visão Geral e Mapa não quebram mais quando um equipamento comparado não gera sincronizações (guarda contra coluna distancia_km ausente).
+
+## v0.14.1
+- **Relatórios exportados completos** (PDF e Excel), cobrindo tudo que a ferramenta mostra.
+  - PDF: acrescentadas seções de Precisão por Faixa, Raio do Sistema por Faixa, Rede & Operadora, Qualidade de GPS e Latência & Buffer — todas com explicações.
+  - Excel: novas abas Faixas_Precisão, Faixas_Raio, Qualidade_GPS e Movimento (somando às já existentes: Informações, Resumo, Rede_Bateria, Latência_Buffer, Buffer_LIFO, Buffer_LIFO_Detalhe, Raio_Sistema, Sync por equipamento e Glossário).
+  - As faixas usam os raios configurados em Parâmetros (R1/R2/R3), consistentes com a plataforma.
