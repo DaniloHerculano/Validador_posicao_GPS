@@ -367,7 +367,7 @@ if eh_individual:
     secoes = {
         "📊 Visão Geral": lambda: g.aba_visao_geral({}, vazio_df, "", raios, dados),
         "🗺 Mapa": lambda: g.aba_mapa_individual(dados),
-        "🎯 Raio do Sistema": lambda: g.aba_raio_individual(dados),
+        "🎯 Raio do Sistema": lambda: g.aba_raio_individual(dados, raios),
         "📶 Rede & Operadora": lambda: g.aba_rede({}, vazio_df, "", [], dados),
         "🛰 Qualidade GPS": lambda: g.aba_qualidade_gps(vazio_df, "", [], dados),
         "🚗 Movimento": lambda: g.aba_movimento(vazio_df, "", [], dados),
@@ -382,7 +382,7 @@ else:
         "📊 Visão Geral": lambda: g.aba_visao_geral(resultados, df_ref, ref_nome, raios, dados),
         "🗺 Mapa": lambda: g.aba_mapa(resultados, df_ref, ref_nome),
         "📍 Precisão GPS": lambda: g.aba_precisao(resultados, raios),
-        "🎯 Raio do Sistema": lambda: g.aba_raio_sistema(resultados),
+        "🎯 Raio do Sistema": lambda: g.aba_raio_sistema(resultados, raios),
         "📶 Rede & Operadora": lambda: g.aba_rede(resultados, df_ref, ref_nome, comparacao, dados),
         "🛰 Qualidade GPS": lambda: g.aba_qualidade_gps(df_ref, ref_nome, comparacao, dados),
         "🚗 Movimento": lambda: g.aba_movimento(df_ref, ref_nome, comparacao, dados),
