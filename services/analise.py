@@ -7,15 +7,26 @@ import numpy as np
 from services.loader import calcular_distancia
 
 
-def sincronizar(df_ref: pd.DataFrame, df_comp: pd.DataFrame, tol_min: int) -> pd.DataFrame:
+def sincronizar(df_ref: pd.DataFrame, df_comp: pd.DataFrame, tol_min: int,
+                apenas_ref_gps_valido: bool = True) -> pd.DataFrame:
     """
     Para cada registro do comparado, encontra o ponto mais próximo no tempo
     na referência (dentro da tolerância) e calcula a distância geodésica.
     Usa lat/lon já consolidadas (XLS > CSV). Inclui endereço/estimada quando houver.
+
+    apenas_ref_gps_valido: se True (padrão), usa como "verdade" SÓ os pontos da
+    referência em que o GPS era válido (posição real). Isso evita medir contra
+    pontos estimados da referência, que não servem de verdade. Se a referência
+    não tiver a marcação de GPS, usa todos os pontos.
     """
     resultados = []
     tol = pd.Timedelta(minutes=tol_min)
     ref = df_ref.dropna(subset=["datetime_module", "latitude", "longitude"])
+    # Filtra a referência para usar apenas pontos com GPS válido (verdade real)
+    if apenas_ref_gps_valido and "_gps_bool" in ref.columns and ref["_gps_bool"].notna().any():
+        ref_val = ref[ref["_gps_bool"] == True]
+        if len(ref_val) > 0:
+            ref = ref_val
     ref_times = ref["datetime_module"]
     if ref_times.empty:
         return pd.DataFrame()

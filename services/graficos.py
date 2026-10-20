@@ -53,7 +53,7 @@ def aba_visao_geral(resultados, df_ref, ref_nome, raios, dados=None):
             tile("Equipamentos", f"{n_equip}", cc="blue"),
             tile("Registros totais", f"{total_reg:,}"),
             tile("Estimada / Real / Misto", f"{n_est} / {n_real} / {n_misto}"),
-            tile("Modo", "Individual", cc="amber"),
+            tile("Modo", "Comparar peças", cc="amber"),
         )
     else:
         grid(
@@ -67,6 +67,10 @@ def aba_visao_geral(resultados, df_ref, ref_nome, raios, dados=None):
 
     # ───────────────────────── Inteligência: melhor peça em cada área ─────────────
     _melhor_por_area(dados, _dtec, resultados if not eh_individual else None)
+
+    # ───────────────────────── Comparação lado a lado (2+ peças) ─────────────────
+    if len(dados) >= 2:
+        _tabela_comparativa(dados, _dtec)
 
     # ───────────────────────── Tabela de equipamentos ─────────────────────────
     sec("Equipamentos do Teste")
@@ -199,6 +203,80 @@ def _destaques_melhor_pior(resultados, dados, _dtec, raio2):
                           f"{buf_por_eq[pior_buf]:.1f}% dos registros", cc="amber"))
     if cards:
         grid(*cards)
+
+
+def _tabela_comparativa(dados, _dtec):
+    """Tabela lado a lado: uma coluna por peça, uma linha por quesito.
+    Facilita comparar modelos (ex.: RI720 × RI700) em cada aspecto."""
+    def _curto(nome):
+        return (nome.split("_GNSS")[0] if "_GNSS" in nome else nome)[:22]
+
+    # Coleta os quesitos de cada equipamento
+    cols = {}
+    for d in dados:
+        dtec = _dtec(d)
+        if dtec is None or len(dtec) == 0:
+            continue
+        nome = _curto(d.get("arquivo", "—"))
+        col = {}
+        col["Modelo"] = d.get("modelo", "—")
+        col["Tipo"] = d.get("tipo", "—")
+        col["Registros"] = f"{d.get('registros', 0):,}"
+        # Rede
+        if "_tech" in dtec.columns and dtec["_tech"].notna().any():
+            tot = len(dtec)
+            col["Rede 4G"] = f"{dtec['_tech'].str.startswith('4G').mean()*100:.0f}%"
+            col["Rede 2G"] = f"{dtec['_tech'].str.startswith('2G').mean()*100:.0f}%"
+            col["Indefinido"] = f"{(dtec['_tech']=='Indefinido').mean()*100:.0f}%"
+        if "_operadora" in dtec.columns and dtec["_operadora"].notna().any():
+            col["Operadora"] = dtec["_operadora"].mode().iloc[0]
+        if "_banda" in dtec.columns and (dtec["_banda"] != "—").any():
+            b = dtec[dtec["_banda"] != "—"]["_banda"].mode()
+            col["Banda predom."] = b.iloc[0] if len(b) else "—"
+        # Bateria
+        bcol = "_bateria_pct" if "_bateria_pct" in dtec.columns else "_bateria_pct_csv"
+        if bcol in dtec.columns and dtec[bcol].notna().any():
+            bp = dtec[bcol].dropna()
+            col["Bateria início"] = f"{bp.iloc[0]:.0f}%"
+            col["Bateria fim"] = f"{bp.iloc[-1]:.0f}%"
+            if len(bp) >= 2:
+                col["Consumo"] = f"{bp.iloc[0]-bp.iloc[-1]:.0f}%"
+        # GPS
+        if "_gps_bool" in dtec.columns and dtec["_gps_bool"].notna().any():
+            col["GPS válido"] = f"{dtec['_gps_bool'].mean()*100:.0f}%"
+        if "satellitenumber" in dtec.columns and dtec["satellitenumber"].notna().any():
+            col["Satélites (méd)"] = f"{dtec['satellitenumber'].dropna().mean():.1f}"
+        # Raio do sistema
+        if "raio_km" in dtec.columns:
+            rk = pd.to_numeric(dtec["raio_km"], errors="coerce").dropna()
+            if len(rk):
+                col["Raio médio (sist.)"] = f"{rk.mean():.2f} km"
+        # Latência / buffer
+        if "_latencia_s" in dtec.columns and dtec["_latencia_s"].notna().any():
+            bufm = dtec["_buffer_bool"].fillna(False) if "_buffer_bool" in dtec.columns else pd.Series(False, index=dtec.index)
+            lr = dtec[~bufm]["_latencia_s"].dropna()
+            col["Latência real"] = f"{lr.mean():.1f}s" if len(lr) else "—"
+            col["Buffer"] = f"{bufm.mean()*100:.0f}%" if bufm.any() else "0%"
+        cols[nome] = col
+
+    if len(cols) == 0:
+        return
+    # Monta o DataFrame transposto: índice = quesitos, colunas = equipamentos
+    todos_quesitos = []
+    for col in cols.values():
+        for k in col:
+            if k not in todos_quesitos:
+                todos_quesitos.append(k)
+    df = pd.DataFrame(index=todos_quesitos)
+    for nome, col in cols.items():
+        df[nome] = [col.get(q, "—") for q in todos_quesitos]
+    df.index.name = "Quesito"
+
+    sec("📋 Comparação Lado a Lado")
+    st.caption("Cada coluna é um equipamento; cada linha, um quesito do teste. "
+               "Compare diretamente, por exemplo, consumo de bateria e cobertura de rede "
+               "entre os modelos.")
+    st.dataframe(df, width='stretch')
 
 
 def _melhor_por_area(dados, _dtec, resultados=None):
