@@ -65,9 +65,8 @@ def aba_visao_geral(resultados, df_ref, ref_nome, raios, dados=None):
                  cc="green" if (erro_medio_global or 9) < raio2 else "amber"),
         )
 
-    # ───────────────────────── Destaques (melhor / pior) ─────────────────────────
-    if not eh_individual and resultados:
-        _destaques_melhor_pior(resultados, dados, _dtec, raio2)
+    # ───────────────────────── Inteligência: melhor peça em cada área ─────────────
+    _melhor_por_area(dados, _dtec, resultados if not eh_individual else None)
 
     # ───────────────────────── Tabela de equipamentos ─────────────────────────
     sec("Equipamentos do Teste")
@@ -81,7 +80,7 @@ def aba_visao_geral(resultados, df_ref, ref_nome, raios, dados=None):
             })
         st.dataframe(pd.DataFrame(linhas_eq), width='stretch', hide_index=True)
 
-    # No modo individual, o painel para por aqui (sem comparação de posição)
+    # No modo individual, mostra também os destaques por área (tabela detalhada)
     if eh_individual:
         _destaques_areas(dados, _dtec)
         return
@@ -199,6 +198,107 @@ def _destaques_melhor_pior(resultados, dados, _dtec, raio2):
         cards.append(tile("📡 Mais perda de sinal (buffer)", _curto(pior_buf),
                           f"{buf_por_eq[pior_buf]:.1f}% dos registros", cc="amber"))
     if cards:
+        grid(*cards)
+
+
+def _melhor_por_area(dados, _dtec, resultados=None):
+    """Inteligência: aponta a melhor peça em cada área. Funciona nos dois modos
+    (usa 'dados'; 'resultados' só agrega quando há comparação)."""
+    def _curto(nome):
+        return (nome.split("_GNSS")[0] if "_GNSS" in nome else nome)[:24]
+
+    cards = []
+
+    # Melhor precisão (só comparativo)
+    if resultados:
+        erro = {n: df["distancia_km"].dropna().mean()
+                for n, df in resultados.items()
+                if "distancia_km" in df.columns and len(df["distancia_km"].dropna())}
+        if erro:
+            mb = min(erro, key=erro.get)
+            cards.append(tile("🏆 Melhor precisão", _curto(mb),
+                              f"erro médio {erro[mb]:.3f} km", cc="green"))
+        # Melhor % dentro do raio
+        dr = {}
+        for n, df in resultados.items():
+            if "dentro_raio" in df.columns:
+                v = df.dropna(subset=["dentro_raio"])
+                if len(v):
+                    dr[n] = v["dentro_raio"].mean() * 100
+        if dr:
+            mb = max(dr, key=dr.get)
+            cards.append(tile("🎯 Melhor validação de raio", _curto(mb),
+                              f"{dr[mb]:.1f}% dentro do raio", cc="green"))
+
+    # Menor raio médio do sistema (sistema mais confiante) — ambos os modos
+    raio_m = {}
+    bat = {}
+    gps_val = {}
+    sat = {}
+    lat = {}
+    buf = {}
+    rede4g = {}
+    for d in dados:
+        dtec = _dtec(d)
+        if dtec is None or len(dtec) == 0:
+            continue
+        nome = d.get("arquivo", "—")
+        if "raio_km" in dtec.columns:
+            rk = pd.to_numeric(dtec["raio_km"], errors="coerce").dropna()
+            if len(rk):
+                raio_m[nome] = rk.mean()
+        bcol = "_bateria_pct" if "_bateria_pct" in dtec.columns else "_bateria_pct_csv"
+        if bcol in dtec.columns and dtec[bcol].notna().any():
+            bp = dtec[bcol].dropna()
+            # menor consumo = menor queda (início - fim)
+            if len(bp) >= 2:
+                bat[nome] = bp.iloc[0] - bp.iloc[-1]
+        if "_gps_bool" in dtec.columns and dtec["_gps_bool"].notna().any():
+            gps_val[nome] = dtec["_gps_bool"].mean() * 100
+        if "satellitenumber" in dtec.columns and dtec["satellitenumber"].notna().any():
+            sat[nome] = dtec["satellitenumber"].dropna().mean()
+        if "_latencia_s" in dtec.columns and dtec["_latencia_s"].notna().any():
+            bufm = dtec["_buffer_bool"].fillna(False) if "_buffer_bool" in dtec.columns else pd.Series(False, index=dtec.index)
+            lr = dtec[~bufm]["_latencia_s"].dropna()
+            if len(lr):
+                lat[nome] = lr.mean()
+            buf[nome] = bufm.mean() * 100
+        if "_tech" in dtec.columns and dtec["_tech"].notna().any():
+            rede4g[nome] = dtec["_tech"].str.startswith("4G").mean() * 100
+
+    if raio_m:
+        mb = min(raio_m, key=raio_m.get)
+        cards.append(tile("📍 Menor raio do sistema", _curto(mb),
+                          f"raio médio {raio_m[mb]:.2f} km", cc="green"))
+    if bat:
+        mb = min(bat, key=bat.get)
+        cards.append(tile("🔋 Melhor bateria (menor consumo)", _curto(mb),
+                          f"queda de {bat[mb]:.0f}% no teste", cc="green"))
+    if gps_val:
+        mb = max(gps_val, key=gps_val.get)
+        cards.append(tile("🛰 Melhor GPS (mais válido)", _curto(mb),
+                          f"{gps_val[mb]:.1f}% de fixes válidos", cc="green"))
+    elif sat:
+        mb = max(sat, key=sat.get)
+        cards.append(tile("🛰 Melhor GPS (mais satélites)", _curto(mb),
+                          f"{sat[mb]:.1f} satélites em média", cc="green"))
+    if rede4g:
+        mb = max(rede4g, key=rede4g.get)
+        cards.append(tile("📶 Melhor cobertura 4G", _curto(mb),
+                          f"{rede4g[mb]:.1f}% em 4G", cc="green"))
+    if lat:
+        mb = min(lat, key=lat.get)
+        cards.append(tile("⏱ Menor latência real", _curto(mb),
+                          f"{lat[mb]:.1f}s em média", cc="green"))
+    if buf and max(buf.values()) > 0:
+        mb = min(buf, key=buf.get)
+        cards.append(tile("✅ Menos perda de sinal", _curto(mb),
+                          f"{buf[mb]:.1f}% de buffer", cc="green"))
+
+    if cards:
+        sec("🥇 Melhor peça em cada área")
+        st.caption("Resumo automático de qual equipamento se destacou em cada aspecto do "
+                   "teste. Veja os detalhes nas seções específicas.")
         grid(*cards)
 
 
@@ -772,10 +872,47 @@ def aba_rede(resultados, df_ref, ref_nome, comparacao, dados):
 # ══════════════════════════════════════════════════════════════════════════════
 def _gps_um(df_raw, titulo, kid="x", expandir=False):
     with st.expander(titulo, expanded=expandir):
+        # ── GPS válido × inválido ──
+        gb = None
+        if "_gps_bool" in df_raw.columns and df_raw["_gps_bool"].notna().any():
+            gb = df_raw["_gps_bool"].dropna()
+        if gb is not None and len(gb) > 0:
+            nv = int(gb.sum())
+            ni = int((~gb).sum())
+            tot = len(gb)
+            st.markdown("**GPS válido × inválido**")
+            st.caption("Um fix de GPS é **válido** quando o módulo obteve posição real por "
+                       "satélite; **inválido** quando não conseguiu (sem fix, sinal fraco "
+                       "ou obstruído) — nesses casos a posição costuma vir estimada por ERB.")
+            grid(
+                tile("GPS Válido", f"{nv/tot*100:.1f}%", f"{nv:,} registros", "green"),
+                tile("GPS Inválido", f"{ni/tot*100:.1f}%", f"{ni:,} registros",
+                     "amber" if ni else ""),
+                tile("Total avaliado", f"{tot:,}", cc="blue"),
+            )
+            cG1, cG2 = st.columns(2)
+            with cG1:
+                fig = go.Figure(go.Pie(labels=["Válido", "Inválido"], values=[nv, ni],
+                    hole=0.55, marker=dict(colors=["#1f8b4c", "#e08a1e"])))
+                fig.update_layout(title="GPS Válido × Inválido")
+                st.plotly_chart(aplica_tema(fig), width='stretch', key=f"gpsval_{kid}")
+            with cG2:
+                if "datetime_module" in df_raw.columns:
+                    dft = df_raw.dropna(subset=["_gps_bool", "datetime_module"]).sort_values("datetime_module").copy()
+                    dft["validos_acum"] = dft["_gps_bool"].astype(int).cumsum()
+                    fig = px.line(dft, x="datetime_module", y="validos_acum",
+                        title="GPS Válidos Acumulados ao Longo do Tempo",
+                        color_discrete_sequence=["#1f8b4c"],
+                        labels={"datetime_module": "Horário", "validos_acum": "GPS válidos (acum.)"})
+                    st.plotly_chart(aplica_tema(fig), width='stretch', key=f"gpsvalts_{kid}")
+            st.markdown("---")
+
         tem_sat = "satellitenumber" in df_raw.columns and df_raw["satellitenumber"].notna().any()
         tem_dop = any(c in df_raw.columns and df_raw[c].notna().any() for c in ["hdop", "vdop", "sdop"])
         if not tem_sat and not tem_dop:
-            st.info("📄 Satélites e DOP vêm do **CSV** (log técnico). Suba o CSV deste equipamento para ver esta análise."); return
+            if gb is None:
+                st.info("📄 Satélites e DOP vêm do **CSV** (log técnico). Suba o CSV deste equipamento para ver esta análise.")
+            return
         if tem_sat:
             sat = df_raw["satellitenumber"].dropna()
             grid(
@@ -1468,6 +1605,18 @@ def aba_raio_sistema(resultados, raios=(1.0, 3.0, 5.0)):
             _bloco_faixas_raio(df["raio_km"], raio1, raio2, raio3, kid=f"comp{ci}")
             st.markdown("---")
             st.markdown("**Validação contra a referência** (posição real × raio do sistema):")
+            explicacao(
+                "⚠️ <b>Não confunda as duas análises acima e abaixo:</b><br>"
+                "• A <b>distribuição por faixa de raio</b> (acima) mostra o tamanho do "
+                "<b>raio que o sistema declarou</b>. Se diz \"0% acima de 5 km\", significa "
+                "que o sistema nunca declarou um raio maior que 5 km.<br>"
+                "• A <b>validação dentro × fora</b> (abaixo) compara a <b>distância real "
+                "medida</b> com esse raio. Um ponto fica <b>fora</b> quando o erro real "
+                "supera o raio declarado — mesmo que o raio seja pequeno.<br>"
+                "Por isso é normal ter <b>0% de raios acima de 5 km</b> e, ao mesmo tempo, "
+                "uma boa parcela <b>fora do raio</b>: o sistema prometeu raios pequenos, "
+                "mas em parte das vezes a posição real caiu bem mais longe do que ele "
+                "prometeu.")
 
             val = df.dropna(subset=["dentro_raio", "distancia_km", "raio_km"]).copy()
             # Garantir tipo booleano limpo para somas e negação

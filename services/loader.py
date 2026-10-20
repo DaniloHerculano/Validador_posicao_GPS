@@ -9,6 +9,31 @@ from geopy.distance import geodesic
 
 from services.config import OPERADORAS, TECH_MAP
 
+# Os arquivos do sistema vêm em UTC-0. O usuário (Brasil) opera em UTC-3.
+# Este deslocamento (em horas) é somado a todas as datas na leitura.
+# Pode ser ajustado em tempo de execução via set_fuso_horas().
+_FUSO_HORAS = -3
+
+
+def set_fuso_horas(h):
+    global _FUSO_HORAS
+    _FUSO_HORAS = int(h)
+
+
+def _ajusta_fuso(df, colunas):
+    """Soma o deslocamento de fuso às colunas de data informadas (UTC-0 -> local)."""
+    if _FUSO_HORAS == 0:
+        return df
+    delta = pd.Timedelta(hours=_FUSO_HORAS)
+    for c in colunas:
+        if c in df.columns:
+            df[c] = df[c] + delta
+    return df
+
+
+_COLS_DATA = ["datetime_module", "datetime_server", "datetime_gps",
+              "datetime_trilateration", "datetime_erb"]
+
 
 # ── Identificação ─────────────────────────────────────────────────────────────
 def nome_base(nome_arquivo: str) -> str:
@@ -140,6 +165,7 @@ def ler_kml(arquivo) -> pd.DataFrame:
 
     df = pd.DataFrame(registros)
     if len(df):
+        df = _ajusta_fuso(df, _COLS_DATA)
         df = df.sort_values("datetime_module").reset_index(drop=True)
     return df
 
@@ -150,6 +176,7 @@ def ler_csv(arquivo) -> pd.DataFrame:
     for col in ["datetime_module", "datetime_server", "datetime_gps", "datetime_trilateration"]:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors="coerce")
+    df = _ajusta_fuso(df, _COLS_DATA)
     for col in ["latitude", "longitude", "altitude", "heading", "speed",
                 "hdop", "vdop", "sdop", "satellitenumber", "voltage",
                 "xaccel", "yaccel", "zaccel", "internal_temperature"]:
@@ -195,6 +222,7 @@ def normalizar_xls(df_xls: pd.DataFrame) -> pd.DataFrame:
     for col in ["datetime_module", "datetime_server", "datetime_gps", "datetime_erb"]:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], dayfirst=True, errors="coerce")
+    df = _ajusta_fuso(df, _COLS_DATA)
     for col in ["latitude", "longitude", "speed"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -241,6 +269,7 @@ def ler_firmware_completo(arquivo) -> pd.DataFrame:
                 "datetime_trilateration"]:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors="coerce")
+    df = _ajusta_fuso(df, _COLS_DATA)
 
     # Numéricos
     for col in ["latitude", "longitude", "altitude", "heading", "speed",
