@@ -156,18 +156,42 @@ def rotulo(d):
     return d["arquivo"]
 mapa_rotulo = {rotulo(d): d["arquivo"] for d in dados}
 
+def _pct_gps_valido(d):
+    """% de pontos que servem de VERDADE: GPS válido E com posição (lat/lon)."""
+    df = d.get("df")  # df principal (posições consolidadas)
+    if df is None or len(df) == 0:
+        return 0.0
+    com_pos = df.dropna(subset=["latitude", "longitude"]) if \
+        {"latitude", "longitude"}.issubset(df.columns) else df.iloc[0:0]
+    if len(com_pos) == 0:
+        return 0.0
+    if "_gps_bool" in com_pos.columns and com_pos["_gps_bool"].notna().any():
+        # pontos com posição E GPS válido / total de pontos com posição
+        return (com_pos["_gps_bool"] == True).sum() / len(com_pos) * 100
+    return 0.0
+
+# % de GPS válido por equipamento (quão confiável é como referência)
+gps_val_por_arq = {d["arquivo"]: _pct_gps_valido(d) for d in dados}
+
 reais = [rotulo(d) for d in dados if d["tipo"] == "GPS Real"]
 todos = [rotulo(d) for d in dados]
 cand = reais if reais else todos
 
-# Modo de análise: comparativo (referência × amostras) ou individual (uma peça)
+# Modo de análise
+MODO_POS = "📍 Validar posição (precisa de peça com GPS real como referência)"
+MODO_PECAS = "📊 Comparar peças (consumo, rede, GPS, raio — sem referência)"
 modo = st.radio(
     "Modo de análise",
-    ["Comparativo (referência × amostras)", "Individual (inspecionar peças, sem comparar)"],
-    horizontal=True,
-    help="No modo individual você vê consumo, rede, GPS, latência etc. de cada peça, "
-         "sem precisar de uma referência para comparar posição.")
-modo_individual = modo.startswith("Individual")
+    [MODO_POS, MODO_PECAS],
+    index=1,  # padrão: comparar peças (caso mais comum)
+    help="• **Validar posição:** mede o erro de posição das amostras contra uma peça "
+         "de referência com GPS ligado (a 'verdade'). Só use se houver uma peça com GPS "
+         "real no teste.\n"
+         "• **Comparar peças:** analisa e compara todas as peças lado a lado em consumo "
+         "de bateria, rede/operadora, qualidade de GPS, latência e raio do sistema — "
+         "sem precisar de referência. Ideal para comparar modelos (ex.: RI720 novo × "
+         "RI700 antigo).")
+modo_individual = modo == MODO_PECAS
 
 if modo_individual:
     referencia = None
@@ -182,9 +206,30 @@ if modo_individual:
             "modo_individual": True})
 else:
     cR, cC = st.columns([1, 2])
+    # Aviso: nenhum equipamento tem GPS real confiável para servir de referência
+    if not reais:
+        melhor = max(dados, key=_pct_gps_valido)
+        pct_melhor = _pct_gps_valido(melhor)
+        if pct_melhor < 50:
+            st.error(
+                "⚠️ **Nenhum equipamento deste teste tem GPS confiável para servir de "
+                "referência.** A validação de posição (erro, dentro/fora do raio) só faz "
+                "sentido quando a referência tem o GPS ligado e válido — ela é a 'verdade' "
+                "contra a qual as estimativas são medidas.\n\n"
+                f"Aqui, o equipamento com mais GPS válido é **{melhor['modelo']} "
+                f"{melhor['pin']}**, com apenas **{pct_melhor:.0f}%** de fixes válidos. "
+                "Comparar contra ele mediria *estimativa × estimativa* (dois chutes), não "
+                "*estimativa × verdade* — por isso os números de erro/raio não serão "
+                "confiáveis.\n\n"
+                "👉 Recomendado: use o modo **Comparar peças** para analisar cada uma "
+                "(rede, bateria, GPS, raio informado), ou refaça o teste incluindo uma "
+                "peça com GPS ligado como referência.")
+
     with cR:
-        ref_rot = st.selectbox("🔵 Referência (GPS Real)", cand,
-            help="Rastreador com GPS ligado — geralmente o RI130")
+        ref_rot = st.selectbox("🔵 Referência (ideal: GPS ligado)", cand,
+            format_func=lambda r: f"{r}  ·  GPS válido {gps_val_por_arq.get(mapa_rotulo.get(r,''),0):.0f}%",
+            help="A referência deve ser um rastreador com GPS ligado. O % ao lado mostra "
+                 "quão confiável é o GPS de cada peça.")
     with cC:
         opc = [r for r in todos if r != ref_rot]
         comp_rot = st.multiselect("🟠 Comparar com", opc, default=opc)
@@ -192,9 +237,19 @@ else:
     referencia = mapa_rotulo[ref_rot]
     comparacao = [mapa_rotulo[r] for r in comp_rot]
 
+    # Aviso se a referência escolhida tem pouco GPS válido
+    pct_ref = gps_val_por_arq.get(referencia, 0)
+    if pct_ref < 50:
+        st.warning(
+            f"⚠️ A referência escolhida tem apenas **{pct_ref:.0f}% de GPS válido**. "
+            "Os pontos em que ela **não** tinha GPS real são estimativas — comparar contra "
+            "eles não valida precisão. A validação de raio abaixo considera **apenas os "
+            "pontos em que a referência tinha GPS válido**; se forem poucos, os resultados "
+            "podem não ser representativos.")
+
     if not comparacao:
         st.warning("Selecione ao menos um rastreador para comparar, "
-                   "ou mude para o modo **Individual** acima.")
+                   "ou mude para o modo **Comparar peças** acima.")
         st.stop()
 
     btn = st.button("🚀  INICIAR ANÁLISE COMPLETA")
