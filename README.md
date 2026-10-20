@@ -225,3 +225,18 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
 - **Análise GPS válido × inválido** (nova, na aba Qualidade GPS): % de fixes válidos/ inválidos, pizza e evolução no tempo, com explicação do que é um fix válido.
 - **Ajuste de fuso horário:** os arquivos vêm em UTC-0 e agora são convertidos para o horário local (padrão UTC-3 / Brasília). Novo controle em Parâmetros para ajustar o fuso (-12 a +12). A latência não é afetada (é uma diferença entre horários).
 - **Explicação na aba Raio do Sistema** esclarecendo por que "0% de raios acima de 5 km" pode conviver com uma parcela "fora do raio" (são medidas diferentes: tamanho do raio declarado × erro real vs. raio).
+
+## v0.16
+- **Correção conceitual importante na validação de posição/raio:** a validação só faz sentido quando a referência tem GPS real (posição verdadeira). Agora:
+  - O seletor de referência mostra o **% de GPS válido** de cada peça.
+  - Se nenhuma peça tem GPS confiável (caso de testes só com peças estimadas), o app **avisa claramente** que a validação de erro/raio não terá sentido (estaria comparando estimativa × estimativa) e recomenda o modo Individual.
+  - Aviso adicional quando a referência escolhida tem pouco GPS válido.
+  - A sincronização passou a usar como verdade **apenas os pontos da referência com GPS válido** (parâmetro apenas_ref_gps_valido, padrão True).
+  - O % de GPS válido agora exige posição (lat/lon) preenchida — pontos "reais" sem coordenada não contam como verdade utilizável.
+
+## v0.17
+- **Modos renomeados** para refletir o uso real:
+  - "📍 Validar posição (precisa de peça com GPS real como referência)" — a antiga comparação de posição.
+  - "📊 Comparar peças (consumo, rede, GPS, raio — sem referência)" — antigo modo individual, agora o padrão, deixando claro que compara todas as peças (exceto posição).
+- **Tabela de comparação lado a lado** na Visão Geral (2+ peças): uma coluna por equipamento, uma linha por quesito (modelo, rede 4G/2G, operadora, banda, bateria início/fim/consumo, GPS válido, satélites, raio médio do sistema, latência real, buffer). Ideal para comparar modelos (ex.: RI720 novo × RI700 antigo).
+- O modo "Comparar peças" é o padrão, atendendo ao caso comum de testes sem peça de referência GPS.
