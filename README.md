@@ -219,3 +219,9 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
   - PDF: acrescentadas seções de Precisão por Faixa, Raio do Sistema por Faixa, Rede & Operadora, Qualidade de GPS e Latência & Buffer — todas com explicações.
   - Excel: novas abas Faixas_Precisão, Faixas_Raio, Qualidade_GPS e Movimento (somando às já existentes: Informações, Resumo, Rede_Bateria, Latência_Buffer, Buffer_LIFO, Buffer_LIFO_Detalhe, Raio_Sistema, Sync por equipamento e Glossário).
   - As faixas usam os raios configurados em Parâmetros (R1/R2/R3), consistentes com a plataforma.
+
+## v0.15
+- **Visão Geral enriquecida com inteligência "Melhor peça em cada área"** (nos dois modos): aponta automaticamente o melhor equipamento em precisão, validação de raio, menor raio do sistema, bateria (menor consumo), GPS (mais válido/satélites), cobertura 4G, menor latência e menos buffer.
+- **Análise GPS válido × inválido** (nova, na aba Qualidade GPS): % de fixes válidos/ inválidos, pizza e evolução no tempo, com explicação do que é um fix válido.
+- **Ajuste de fuso horário:** os arquivos vêm em UTC-0 e agora são convertidos para o horário local (padrão UTC-3 / Brasília). Novo controle em Parâmetros para ajustar o fuso (-12 a +12). A latência não é afetada (é uma diferença entre horários).
+- **Explicação na aba Raio do Sistema** esclarecendo por que "0% de raios acima de 5 km" pode conviver com uma parcela "fora do raio" (são medidas diferentes: tamanho do raio declarado × erro real vs. raio).
