@@ -43,13 +43,18 @@ with st.sidebar:
             help="Janela máxima para parear referência × comparado")
         tol_fusao = st.number_input("Tolerância de fusão CSV↔XLS (s)", 5, 300, 60, 5,
             help="Janela para casar o log técnico (CSV) ao ponto de posição (XLS)")
+        fuso = st.number_input("Fuso horário (horas vs UTC)", -12, 12, -3, 1,
+            help="Os arquivos vêm em UTC-0. O padrão -3 converte para o horário de "
+                 "Brasília. Altere se estiver em outro fuso.")
+        from services.loader import set_fuso_horas
+        set_fuso_horas(fuso)
         st.markdown("**Raios de precisão (km)**")
         raio1 = st.number_input("Raio 1 (km)", value=1.0, step=0.5, min_value=0.1)
         raio2 = st.number_input("Raio 2 (km)", value=3.0, step=0.5, min_value=0.1)
         raio3 = st.number_input("Raio 3 (km)", value=5.0, step=0.5, min_value=0.1)
     st.markdown("---")
     # botao_sair()  # login desabilitado — botão de sair oculto
-    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.11.9</span>',
+    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.15</span>',
                 unsafe_allow_html=True)
 
 # ── AJUDA RÁPIDA ──────────────────────────────────────────────────────────────
