@@ -192,6 +192,144 @@ def _nota(pdf, texto):
     pdf.set_y(y + altura + 2)
 
 
+def _quebra(pdf, limite=235):
+    if pdf.get_y() > limite:
+        pdf.add_page()
+
+
+def _melhor_peca(pdf, dados, resultados):
+    """Cards: melhor peça em cada área."""
+    cards = []
+    if resultados:
+        erro = {n: df["distancia_km"].dropna().mean() for n, df in resultados.items()
+                if "distancia_km" in df.columns and len(df["distancia_km"].dropna())}
+        if erro:
+            mb = min(erro, key=erro.get)
+            cards.append(("Melhor precisao", _curto(mb), f"erro {erro[mb]:.3f} km", GREEN))
+        dr = {}
+        for n, df in resultados.items():
+            if "dentro_raio" in df.columns:
+                v = df.dropna(subset=["dentro_raio"])
+                if len(v):
+                    dr[n] = v["dentro_raio"].mean() * 100
+        if dr:
+            mb = max(dr, key=dr.get)
+            cards.append(("Melhor validacao raio", _curto(mb), f"{dr[mb]:.1f}% dentro", GREEN))
+    raio_m, bat, gpsv, sat, lat, buf, r4g = {}, {}, {}, {}, {}, {}, {}
+    for d in dados:
+        dtec = _dtec(d)
+        if dtec is None or len(dtec) == 0:
+            continue
+        nome = d.get("arquivo", "-")
+        if "raio_km" in dtec.columns:
+            rk = pd.to_numeric(dtec["raio_km"], errors="coerce").dropna()
+            if len(rk):
+                raio_m[nome] = rk.mean()
+        bcol = "_bateria_pct" if "_bateria_pct" in dtec.columns else "_bateria_pct_csv"
+        if bcol in dtec.columns and dtec[bcol].notna().any():
+            bp = dtec[bcol].dropna()
+            if len(bp) >= 2:
+                bat[nome] = bp.iloc[0] - bp.iloc[-1]
+        if "_gps_bool" in dtec.columns and dtec["_gps_bool"].notna().any():
+            gpsv[nome] = dtec["_gps_bool"].mean() * 100
+        if "satellitenumber" in dtec.columns and dtec["satellitenumber"].notna().any():
+            sat[nome] = dtec["satellitenumber"].dropna().mean()
+        if "_latencia_s" in dtec.columns and dtec["_latencia_s"].notna().any():
+            bufm = dtec["_buffer_bool"].fillna(False) if "_buffer_bool" in dtec.columns else pd.Series(False, index=dtec.index)
+            lr = dtec[~bufm]["_latencia_s"].dropna()
+            if len(lr):
+                lat[nome] = lr.mean()
+            buf[nome] = bufm.mean() * 100
+        if "_tech" in dtec.columns and dtec["_tech"].notna().any():
+            r4g[nome] = dtec["_tech"].str.startswith("4G").mean() * 100
+    if raio_m:
+        mb = min(raio_m, key=raio_m.get)
+        cards.append(("Menor raio do sistema", _curto(mb), f"raio {raio_m[mb]:.2f} km", GREEN))
+    if bat:
+        mb = min(bat, key=bat.get)
+        cards.append(("Melhor bateria", _curto(mb), f"queda {bat[mb]:.0f}%", GREEN))
+    if gpsv and max(gpsv.values()) > 0:
+        mb = max(gpsv, key=gpsv.get)
+        cards.append(("Melhor GPS", _curto(mb), f"{gpsv[mb]:.1f}% valido", GREEN))
+    elif sat:
+        mb = max(sat, key=sat.get)
+        cards.append(("Melhor GPS", _curto(mb), f"{sat[mb]:.1f} satelites", GREEN))
+    if r4g:
+        mb = max(r4g, key=r4g.get)
+        cards.append(("Melhor cobertura 4G", _curto(mb), f"{r4g[mb]:.1f}% em 4G", GREEN))
+    if lat:
+        mb = min(lat, key=lat.get)
+        cards.append(("Menor latencia", _curto(mb), f"{lat[mb]:.1f}s", GREEN))
+    if buf and max(buf.values()) > 0:
+        mb = min(buf, key=buf.get)
+        cards.append(("Menos buffer", _curto(mb), f"{buf[mb]:.1f}%", GREEN))
+    if cards:
+        _quebra(pdf, 215)
+        _titulo(pdf, "Melhor Peca em Cada Area")
+        # desenha em linhas de até 4 cards
+        for i in range(0, len(cards), 4):
+            _cards(pdf, cards[i:i+4])
+
+
+def _comparacao_lado_a_lado(pdf, dados):
+    """Tabela transposta: uma coluna por peça, uma linha por quesito."""
+    cols = {}
+    for d in dados:
+        dtec = _dtec(d)
+        if dtec is None or len(dtec) == 0:
+            continue
+        nome = _curto(d.get("arquivo", "-"))
+        col = {"Modelo": d.get("modelo", "-"), "Tipo": d.get("tipo", "-"),
+               "Registros": f"{d.get('registros', 0):,}"}
+        if "_tech" in dtec.columns and dtec["_tech"].notna().any():
+            col["Rede 4G"] = f"{dtec['_tech'].str.startswith('4G').mean()*100:.0f}%"
+            col["Rede 2G"] = f"{dtec['_tech'].str.startswith('2G').mean()*100:.0f}%"
+            col["Indefinido"] = f"{(dtec['_tech']=='Indefinido').mean()*100:.0f}%"
+        if "_operadora" in dtec.columns and dtec["_operadora"].notna().any():
+            col["Operadora"] = dtec["_operadora"].mode().iloc[0]
+        if "_banda" in dtec.columns and (dtec["_banda"] != "-").any():
+            b = dtec[dtec["_banda"] != "-"]["_banda"].mode()
+            col["Banda"] = b.iloc[0] if len(b) else "-"
+        bcol = "_bateria_pct" if "_bateria_pct" in dtec.columns else "_bateria_pct_csv"
+        if bcol in dtec.columns and dtec[bcol].notna().any():
+            bp = dtec[bcol].dropna()
+            col["Bat. inicio"] = f"{bp.iloc[0]:.0f}%"
+            col["Bat. fim"] = f"{bp.iloc[-1]:.0f}%"
+            if len(bp) >= 2:
+                col["Consumo"] = f"{bp.iloc[0]-bp.iloc[-1]:.0f}%"
+        if "_gps_bool" in dtec.columns and dtec["_gps_bool"].notna().any():
+            col["GPS valido"] = f"{dtec['_gps_bool'].mean()*100:.0f}%"
+        if "satellitenumber" in dtec.columns and dtec["satellitenumber"].notna().any():
+            col["Satelites"] = f"{dtec['satellitenumber'].dropna().mean():.1f}"
+        if "raio_km" in dtec.columns:
+            rk = pd.to_numeric(dtec["raio_km"], errors="coerce").dropna()
+            if len(rk):
+                col["Raio medio"] = f"{rk.mean():.2f} km"
+        if "_latencia_s" in dtec.columns and dtec["_latencia_s"].notna().any():
+            bufm = dtec["_buffer_bool"].fillna(False) if "_buffer_bool" in dtec.columns else pd.Series(False, index=dtec.index)
+            lr = dtec[~bufm]["_latencia_s"].dropna()
+            col["Latencia real"] = f"{lr.mean():.1f}s" if len(lr) else "-"
+            col["Buffer"] = f"{bufm.mean()*100:.0f}%" if bufm.any() else "0%"
+        cols[nome] = col
+    if len(cols) < 2:
+        return
+    quesitos = []
+    for col in cols.values():
+        for k in col:
+            if k not in quesitos:
+                quesitos.append(k)
+    # DataFrame: coluna "Quesito" + uma coluna por equipamento
+    df = pd.DataFrame({"Quesito": quesitos})
+    for nome, col in cols.items():
+        df[nome] = [col.get(q, "-") for q in quesitos]
+    _quebra(pdf, 200)
+    _titulo(pdf, "Comparacao Lado a Lado")
+    # largura: quesito fixo + resto dividido
+    nc = len(cols)
+    larg = [40] + [(186 - 40) / nc] * nc
+    _tabela(pdf, df, larguras=larg, maxlin=40)
+
+
 def gerar_pdf(resultados, dados, raios, ref_nome="", eh_individual=False,
               tolerancia=10, tol_fusao=60) -> bytes:
     raio1, raio2, raio3 = raios
@@ -230,10 +368,17 @@ def gerar_pdf(resultados, dados, raios, ref_nome="", eh_individual=False,
         "Registros": d.get("registros", 0)} for d in dados])
     _tabela(pdf, df_eq, larguras=[22, 28, 48, 48, 40])
 
+    # ── Melhor peça em cada área + comparação lado a lado ──
+    _melhor_peca(pdf, dados, resultados if not eh_individual else None)
+    if len(dados) >= 2:
+        _comparacao_lado_a_lado(pdf, dados)
+
     # ── Precisão (comparativo) ──
     if not eh_individual and resultados:
         linhas = []
         for nome, df in resultados.items():
+            if "distancia_km" not in df.columns:
+                continue
             d = df["distancia_km"].dropna()
             if len(d) == 0:
                 continue
@@ -257,7 +402,8 @@ def gerar_pdf(resultados, dados, raios, ref_nome="", eh_individual=False,
             pdf.cell(0, 5, _txt("Erro médio por equipamento (km)"), new_x="LMARGIN", new_y="NEXT")
             pdf.ln(1)
             pares = [(n, df["distancia_km"].dropna().mean())
-                     for n, df in resultados.items() if len(df["distancia_km"].dropna())]
+                     for n, df in resultados.items()
+                     if "distancia_km" in df.columns and len(df["distancia_km"].dropna())]
             _barras(pdf, pares, unidade=" km", cor=RED)
 
     # ── Destaques por área ──
@@ -425,6 +571,86 @@ def gerar_pdf(resultados, dados, raios, ref_nome="", eh_individual=False,
         _nota(pdf, "Latência = tempo entre o registro no módulo e a chegada ao servidor. "
                    "\"Lat real\" exclui os registros de buffer (que sobem atrasados após "
                    "perda de sinal e, por serem LIFO, não refletem a velocidade real).")
+
+    # ── GPS válido × inválido ──
+    linhas_gv = []
+    for d in dados:
+        dtec = _dtec(d)
+        if dtec is None or "_gps_bool" not in dtec.columns or dtec["_gps_bool"].isna().all():
+            continue
+        gb = dtec["_gps_bool"].dropna()
+        nv, ni, tot = int(gb.sum()), int((~gb).sum()), len(gb)
+        linhas_gv.append({"Equipamento": _curto(d.get("arquivo", "-")),
+            "GPS válido": f"{nv} ({nv/tot*100:.1f}%)",
+            "GPS inválido": f"{ni} ({ni/tot*100:.1f}%)", "Total": tot})
+    if linhas_gv:
+        _quebra(pdf)
+        _titulo(pdf, "GPS Valido x Invalido")
+        _tabela(pdf, pd.DataFrame(linhas_gv))
+        _nota(pdf, "Um fix de GPS e valido quando o modulo obteve posicao real por "
+                   "satelite; invalido quando nao conseguiu - nesses casos a posicao "
+                   "costuma vir estimada por ERB.")
+
+    # ── Bateria ──
+    linhas_bat = []
+    for d in dados:
+        dtec = _dtec(d)
+        if dtec is None:
+            continue
+        bcol = "_bateria_pct" if "_bateria_pct" in dtec.columns else "_bateria_pct_csv"
+        if bcol not in dtec.columns or dtec[bcol].isna().all():
+            continue
+        bp = dtec[bcol].dropna()
+        if len(bp) < 2:
+            continue
+        linhas_bat.append({"Equipamento": _curto(d.get("arquivo", "-")),
+            "Início": f"{bp.iloc[0]:.0f}%", "Fim": f"{bp.iloc[-1]:.0f}%",
+            "Consumo": f"{bp.iloc[0]-bp.iloc[-1]:.0f}%",
+            "Mínima": f"{bp.min():.0f}%"})
+    if linhas_bat:
+        _quebra(pdf)
+        _titulo(pdf, "Bateria")
+        _tabela(pdf, pd.DataFrame(linhas_bat))
+
+    # ── Movimento ──
+    linhas_mov = []
+    for d in dados:
+        dtec = _dtec(d)
+        if dtec is None or "speed" not in dtec.columns or dtec["speed"].isna().all():
+            continue
+        s = dtec["speed"].dropna()
+        linhas_mov.append({"Equipamento": _curto(d.get("arquivo", "-")),
+            "Vel. média": f"{s.mean():.1f} km/h", "Vel. máxima": f"{s.max():.1f} km/h",
+            "% em movimento": f"{(s > 3).mean()*100:.1f}%", "Registros": len(s)})
+    if linhas_mov:
+        _quebra(pdf)
+        _titulo(pdf, "Movimento")
+        _tabela(pdf, pd.DataFrame(linhas_mov))
+
+    # ── Buffer LIFO (comparativo e individual) ──
+    from services.analise import analisar_buffer_lifo
+    linhas_lifo = []
+    for d in dados:
+        dtec = _dtec(d)
+        if dtec is None:
+            continue
+        try:
+            r = analisar_buffer_lifo(dtec)
+        except Exception:
+            r = None
+        if not r or r.get("n_episodios", 0) == 0:
+            continue
+        linhas_lifo.append({"Equipamento": _curto(d.get("arquivo", "-")),
+            "Episódios": r["n_episodios"],
+            "% em ordem LIFO": f"{r.get('pct_conforme', 0):.1f}%",
+            "Reg. fora de ordem": r.get("registros_fora_ordem", 0)})
+    if linhas_lifo:
+        _quebra(pdf)
+        _titulo(pdf, "Buffer - Verificacao de Ordem LIFO")
+        _tabela(pdf, pd.DataFrame(linhas_lifo))
+        _nota(pdf, "Ao perder sinal, o modulo guarda os pontos e, ao reconectar, sobe "
+                   "primeiro os mais recentes (LIFO). Esta verificacao confirma se a "
+                   "ordem de chegada respeita esse padrao.")
 
     out = pdf.output()
     return bytes(out)
