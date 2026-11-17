@@ -54,7 +54,7 @@ with st.sidebar:
         raio3 = st.number_input("Raio 3 (km)", value=5.0, step=0.5, min_value=0.1)
     st.markdown("---")
     # botao_sair()  # login desabilitado — botão de sair oculto
-    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.15</span>',
+    st.markdown('<span style="font-size:.68rem;color:#4a5568">Stoneridge Brasil · v0.18</span>',
                 unsafe_allow_html=True)
 
 # ── AJUDA RÁPIDA ──────────────────────────────────────────────────────────────
