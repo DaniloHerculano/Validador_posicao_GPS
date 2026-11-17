@@ -240,3 +240,10 @@ Credenciais (provisórias, definidas em services/auth.py): usuário `validapst` 
   - "📊 Comparar peças (consumo, rede, GPS, raio — sem referência)" — antigo modo individual, agora o padrão, deixando claro que compara todas as peças (exceto posição).
 - **Tabela de comparação lado a lado** na Visão Geral (2+ peças): uma coluna por equipamento, uma linha por quesito (modelo, rede 4G/2G, operadora, banda, bateria início/fim/consumo, GPS válido, satélites, raio médio do sistema, latência real, buffer). Ideal para comparar modelos (ex.: RI720 novo × RI700 antigo).
 - O modo "Comparar peças" é o padrão, atendendo ao caso comum de testes sem peça de referência GPS.
+
+## v0.18
+- **Relatório PDF completo (nos dois modos):** o PDF exportado agora traz todas as análises que aparecem no site, não só o resumo. Além das seções já existentes (Panorama, Equipamentos, Precisão, Destaques por Área, Rede e Operadora, Qualidade de GPS, Latência e Buffer), foram acrescentadas:
+  - **Melhor peça em cada área** — cards com o melhor equipamento em precisão, validação de raio, bateria, GPS, cobertura 4G, latência e buffer.
+  - **Comparação lado a lado** — uma coluna por equipamento, uma linha por quesito (modelo, rede, operadora, banda, bateria, GPS, satélites, raio, latência, buffer).
+  - **GPS válido × inválido**, **Bateria** (início/fim/consumo/mínima), **Movimento** (vel. média/máx, % em movimento) e **Buffer – verificação de ordem LIFO** (episódios, % em ordem, registros fora de ordem).
+- Todas as novas seções são tolerantes à ausência de dados — funcionam tanto no modo "Validar posição" quanto em "Comparar peças", sem exigir peça de referência GPS.
